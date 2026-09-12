@@ -5,7 +5,7 @@ spring:
   application:
     name: payment-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/gamingcastle
+    url: jdbc:postgresql://localhost:5433/gamingcastle_payments
     username: gc_admin
     password: gc_password
   jpa:
