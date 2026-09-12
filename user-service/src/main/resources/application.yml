@@ -1,0 +1,31 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/gamingcastle_users
+    username: gc_admin
+    password: gc_password
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema, not Hibernate — see db/migration
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET:gaming-castle-dev-secret-change-me-in-production-min-256-bits}
+  expiration-ms: 900000   # 15 minutes, per ADR-07
