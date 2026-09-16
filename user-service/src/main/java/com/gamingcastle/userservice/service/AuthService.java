@@ -1,8 +1,8 @@
 package com.gamingcastle.userservice.service;
 
-import com.gamingcastle.userservice.dto.AuthResponse;
-import com.gamingcastle.userservice.dto.LoginRequest;
-import com.gamingcastle.userservice.dto.RegisterRequest;
+import com.gamingcastle.userservice.dto.response.AuthResponse;
+import com.gamingcastle.userservice.dto.request.LoginRequest;
+import com.gamingcastle.userservice.dto.request.RegisterRequest;
 
 /**
  * FR-01–FR-06: registration, login, and account-lockout contract.

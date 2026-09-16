@@ -1,4 +1,4 @@
-package com.gamingcastle.userservice.dto;
+package com.gamingcastle.userservice.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 

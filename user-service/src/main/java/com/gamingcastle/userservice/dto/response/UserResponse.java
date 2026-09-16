@@ -1,4 +1,4 @@
-package com.gamingcastle.userservice.dto;
+package com.gamingcastle.userservice.dto.response;
 
 import com.gamingcastle.userservice.entity.User;
 

@@ -1,4 +1,4 @@
-package com.gamingcastle.userservice.dto;
+package com.gamingcastle.userservice.dto.response;
 
 public record AuthResponse(
         String accessToken,

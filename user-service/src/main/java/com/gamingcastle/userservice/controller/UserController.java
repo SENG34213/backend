@@ -1,9 +1,10 @@
 package com.gamingcastle.userservice.controller;
 
-import com.gamingcastle.userservice.dto.UpdateProfileRequest;
-import com.gamingcastle.userservice.dto.UserResponse;
+import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
+import com.gamingcastle.userservice.dto.response.UserResponse;
 import com.gamingcastle.userservice.security.GatewayAuthenticationFilter;
 import com.gamingcastle.userservice.service.UserService;
+import com.gamingcastle.userservice.util.APIEndPoints;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping(APIEndPoints.baseAPI)
 public class UserController {
 
     private final UserService userService;
@@ -24,21 +25,20 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping("/me")
+    @GetMapping(APIEndPoints.profile)
     public ResponseEntity<UserResponse> getMyProfile(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId) {
 
         return ResponseEntity.ok(UserResponse.from(userService.getMyProfile(userId)));
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping(APIEndPoints.userById)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getUserById(@PathVariable UUID userId) {
         return ResponseEntity.ok(UserResponse.from(userService.getUserById(userId)));
     }
 
-    /** Admin-only endpoint. */
-    @GetMapping
+    @GetMapping(APIEndPoints.users)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         List<UserResponse> users = userService.getAllUsers()
@@ -48,7 +48,7 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @PatchMapping("/me")
+    @PatchMapping(APIEndPoints.profile)
     public ResponseEntity<UserResponse> updateMyProfile(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId,
             @Valid @RequestBody UpdateProfileRequest request) {
@@ -59,7 +59,7 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/me")
+    @DeleteMapping(APIEndPoints.profile)
     public ResponseEntity<Void> deleteMyAccount(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId) {
 
