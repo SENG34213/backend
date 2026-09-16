@@ -1,5 +1,6 @@
 package com.gamingcastle.userservice.config;
 
+import com.gamingcastle.userservice.security.GatewayAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -8,6 +9,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * User Service sits behind the Gateway, which already validates JWTs and
@@ -20,6 +22,12 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final GatewayAuthenticationFilter gatewayAuthenticationFilter;
+
+    public SecurityConfig(GatewayAuthenticationFilter gatewayAuthenticationFilter) {
+        this.gatewayAuthenticationFilter = gatewayAuthenticationFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,7 +48,8 @@ public class SecurityConfig {
                         "/v3/api-docs/**"
                 ).permitAll()
                 .anyRequest().authenticated()
-            );
+            )
+        .addFilterBefore(gatewayAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

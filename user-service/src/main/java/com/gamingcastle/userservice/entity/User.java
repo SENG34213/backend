@@ -21,7 +21,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class User extends BaseEntity{
 
     @Id
     @GeneratedValue
@@ -51,22 +51,6 @@ public class User {
     @Builder.Default
     private boolean enabled = true;
 
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(nullable = false)
-    private Instant updatedAt;
-
-    @PrePersist
-    void onCreate() {
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     public boolean isLocked() {
         return lockedUntil != null && lockedUntil.isAfter(Instant.now());

@@ -1,6 +1,6 @@
 package com.gamingcastle.userservice.exception;
 
-import com.gamingcastle.userservice.dto.ErrorResponse;
+import com.gamingcastle.userservice.dto.response.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
