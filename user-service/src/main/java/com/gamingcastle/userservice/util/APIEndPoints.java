@@ -17,8 +17,7 @@ public final class APIEndPoints {
     public static final String register = "/register";
 
     // ---- user endpoints ----
-    public static final String user = "user";
-    public static final String users = "users";
-    public static final String profile = user + "/me";
-    public static final String userById = user + id;
+    public static final String users = "/users";
+    public static final String profile = users + "/me";
+    public static final String userById = users + id;
 }
