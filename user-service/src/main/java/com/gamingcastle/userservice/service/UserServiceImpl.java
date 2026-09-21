@@ -1,15 +1,21 @@
 package com.gamingcastle.userservice.service;
 
+import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
+import com.gamingcastle.userservice.dto.response.UserProfileResponse;
+import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
 import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.AuthException;
 import com.gamingcastle.userservice.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -21,49 +27,80 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public User getMyProfile(UUID userId) {
-        return findUser(userId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getUserById(UUID userId) {
-        return findUser(userId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public UserProfileResponse getMyProfile(UUID userId) {
+        User user = findByIdOrThrow(userId);
+        return toProfileResponse(user);
     }
 
     @Override
     @Transactional
-    public User updateMyProfile(UUID userId, String fullName, String phoneNumber) {
-        User user = findUser(userId);
+    public UserProfileResponse updateMyProfile(UUID userId, UpdateProfileRequest request) {
+        User user = findByIdOrThrow(userId);
 
-        if (fullName != null && !fullName.isBlank()) {
-            user.setFullName(fullName.trim());
+        // US-3 AC: only fullName/phoneNumber can change here — email, role,
+        // and enabled status are deliberately untouched by this endpoint.
+        user.setFullName(request.fullName());
+        user.setPhoneNumber(request.phoneNumber());
+        userRepository.save(user);
+
+        log.info("Profile updated: userId={}", userId);
+        return toProfileResponse(user);
+    }
+
+    @Override
+    public Page<UserSummaryResponse> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::toSummaryResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserSummaryResponse getUserById(UUID userId) {
+        User user = findByIdOrThrow(userId);
+        return toSummaryResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public void deactivateAccount(UUID userId) {
+        User user = findByIdOrThrow(userId);
+
+        if (!user.isEnabled()) {
+            throw new AuthException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND",
+                    "No user found with the given id");
         }
-        user.setPhoneNumber(phoneNumber == null ? null : phoneNumber.trim());
+        user.setEnabled(false);
+        userRepository.save(user);
 
-        return userRepository.save(user);
+        log.info("Account deactivated: userId={}", userId);
     }
 
-    @Override
-    @Transactional
-    public void deleteMyAccount(UUID userId) {
-        User user = findUser(userId);
-        userRepository.delete(user);
+    private User findByIdOrThrow(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND",
+                        "No user found with the given id"));
     }
 
-    private User findUser(UUID userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new AuthException(
-                        HttpStatus.NOT_FOUND,
-                        "USER_NOT_FOUND",
-                        "User not found"
-                ));
+    private UserProfileResponse toProfileResponse(User user) {
+        return new UserProfileResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhoneNumber(),
+                user.getRole().name()
+        );
+    }
+
+    private UserSummaryResponse toSummaryResponse(User user) {
+        return new UserSummaryResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhoneNumber(),
+                user.getRole().name(),
+                user.isEnabled(),
+                user.getCreatedAt()
+        );
     }
 }
+
 
