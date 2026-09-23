@@ -12,9 +12,11 @@ public final class ErrorCodes {
     public static final String ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
     public static final String ACCOUNT_DISABLED = "ACCOUNT_DISABLED";
     public static final String INVALID_TOKEN = "INVALID_TOKEN";
+    public static final String UNAUTHORIZED = "UNAUTHORIZED";
 
     // --- user ---
     public static final String USER_NOT_FOUND = "USER_NOT_FOUND";
+    public static final String USER_ALREADY_DEACTIVATED = "USER_ALREADY_DEACTIVATED";
     public static final String FORBIDDEN = "FORBIDDEN";
 
     // --- generic / request level ---
@@ -26,4 +28,9 @@ public final class ErrorCodes {
     public static final String METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+
+    // --- default messages shared by more than one class ---
+    public static final String UNAUTHORIZED_MESSAGE = "Authentication is required to access this resource";
+    public static final String FORBIDDEN_MESSAGE = "You do not have permission to perform this action";
+    public static final String INTERNAL_ERROR_MESSAGE = "An unexpected error occurred. Please try again later";
 }

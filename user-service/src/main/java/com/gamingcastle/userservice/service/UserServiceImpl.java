@@ -4,12 +4,12 @@ import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
 import com.gamingcastle.userservice.entity.User;
-import com.gamingcastle.userservice.exception.AuthException;
+import com.gamingcastle.userservice.exception.UserAlreadyDeactivatedException;
+import com.gamingcastle.userservice.exception.UserNotFoundException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,8 +65,7 @@ public class UserServiceImpl implements UserService {
         User user = findByIdOrThrow(userId);
 
         if (!user.isEnabled()) {
-            throw new AuthException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND",
-                    "No user found with the given id");
+            throw new UserAlreadyDeactivatedException(userId);
         }
         user.setEnabled(false);
         userRepository.save(user);
@@ -76,8 +75,7 @@ public class UserServiceImpl implements UserService {
 
     private User findByIdOrThrow(UUID id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND",
-                        "No user found with the given id"));
+                .orElseThrow(() -> new UserNotFoundException(id));
     }
 
     private UserProfileResponse toProfileResponse(User user) {
@@ -102,5 +100,3 @@ public class UserServiceImpl implements UserService {
         );
     }
 }
-
-

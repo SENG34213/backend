@@ -2,7 +2,6 @@ package com.gamingcastle.userservice.controller;
 
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
-import com.gamingcastle.userservice.dto.response.UserResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
 import com.gamingcastle.userservice.security.GatewayAuthenticationFilter;
 import com.gamingcastle.userservice.service.UserService;
@@ -16,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -73,6 +71,4 @@ public class UserController {
         userService.deactivateAccount(userId);
         return ResponseEntity.noContent().build();
     }
-
 }
-

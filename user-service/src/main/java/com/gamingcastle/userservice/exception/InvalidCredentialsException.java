@@ -1,7 +1,7 @@
 package com.gamingcastle.userservice.exception;
 
 
-public class InvalidCredentialsException extends AuthException {
+public class InvalidCredentialsException extends RuntimeException {
 
     public InvalidCredentialsException() {
         this("Invalid email or password");
