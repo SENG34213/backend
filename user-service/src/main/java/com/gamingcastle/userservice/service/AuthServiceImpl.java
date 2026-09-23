@@ -5,12 +5,13 @@ import com.gamingcastle.userservice.dto.request.LoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
-import com.gamingcastle.userservice.exception.AuthException;
+import com.gamingcastle.userservice.exception.AccountLockedException;
+import com.gamingcastle.userservice.exception.EmailAlreadyExistsException;
+import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,7 +51,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (userRepository.existsByEmail(email)) {log.warn("Registration failed - email already exists: {}", email);
 
-            throw new AuthException(HttpStatus.CONFLICT,"EMAIL_TAKEN","An account with this email already exists");
+            throw new EmailAlreadyExistsException();
         }
 
         User user = User.builder()
@@ -82,12 +83,12 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found for email: {}", email);
-                    return new AuthException(HttpStatus.UNAUTHORIZED,"INVALID_CREDENTIALS","Invalid email or password");
+                    return new InvalidCredentialsException();
                 });
 
         if (user.isLocked()) {
             log.warn("Login rejected - account is locked for email: {}", email);
-            throw new AuthException(HttpStatus.LOCKED,"ACCOUNT_LOCKED","Account is temporarily locked due to repeated failed login attempts");
+            throw new AccountLockedException();
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -100,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("Account locked due to repeated failed login attempts: {}", email);
             }
 
-            throw new AuthException(HttpStatus.UNAUTHORIZED,"INVALID_CREDENTIALS","Invalid email or password");
+            throw new InvalidCredentialsException();
         }
 
         // Successful login resets the failed-attempt counter

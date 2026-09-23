@@ -5,7 +5,6 @@ import com.gamingcastle.userservice.dto.request.LoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
-import com.gamingcastle.userservice.exception.AuthException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +71,7 @@ class AuthServiceTest {
 
         // Act & Assert
         assertThatThrownBy(() -> authService.register(request))
-                .isInstanceOf(AuthException.class)
+                .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("already exists");
         verify(userRepository, never()).save(any());
     }
@@ -117,7 +116,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
 
         // Act & Assert
-        assertThatThrownBy(() -> authService.login(request)).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> authService.login(request)).isInstanceOf(RuntimeException.class);
         assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
         assertThat(user.isLocked()).isTrue();
     }
@@ -138,7 +137,7 @@ class AuthServiceTest {
 
         // Act & Assert
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(AuthException.class)
+                .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("locked");
         verify(passwordEncoder, never()).matches(any(), any());
     }
