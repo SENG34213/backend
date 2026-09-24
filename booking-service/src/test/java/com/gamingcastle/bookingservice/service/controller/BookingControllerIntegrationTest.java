@@ -179,15 +179,11 @@ class BookingControllerIntegrationTest {
 
     @Test
     void anyEndpoint_withoutIdentityHeaders_shouldReturn401() {
-        // Arrange — no X-User-Id/X-User-Role at all, simulating a request
-        // that somehow bypassed the Gateway
         HttpEntity<Void> entity = new HttpEntity<>(new HttpHeaders());
 
-        // Act
         ResponseEntity<String> response = restTemplate.exchange(
                 "/api/bookings/mine", HttpMethod.GET, entity, String.class);
 
-        // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }
