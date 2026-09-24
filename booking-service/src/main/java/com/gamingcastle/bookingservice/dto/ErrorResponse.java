@@ -1,4 +1,3 @@
 package com.gamingcastle.bookingservice.dto;
 
-public class ErrorResponse {
-}
+public record ErrorResponse(String error, String message) {}
