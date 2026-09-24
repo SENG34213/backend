@@ -1,4 +1,4 @@
-package com.gamingcastle.bookingservice.service;
+package com.gamingcastle.bookingservice.service.service;
 
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
@@ -6,6 +6,8 @@ import com.gamingcastle.bookingservice.entity.*;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
+import com.gamingcastle.bookingservice.service.BookingService;
+import com.gamingcastle.bookingservice.service.BookingServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
