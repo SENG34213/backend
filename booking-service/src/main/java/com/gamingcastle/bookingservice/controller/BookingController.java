@@ -31,6 +31,7 @@ public class BookingController {
     }
 
     /** FR-08: customer self-service booking. */
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
             @Valid @RequestBody BookingRequest request,
@@ -56,6 +57,7 @@ public class BookingController {
     }
 
     /** FR-13: cancel — own booking, or any booking if the caller is ADMIN. */
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<BookingResponse> cancelBooking(
             @PathVariable("id") UUID bookingId,
