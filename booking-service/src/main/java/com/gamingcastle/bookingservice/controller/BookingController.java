@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,10 +43,23 @@ public class BookingController {
 
     /** FR-09: admin walk-in booking, on behalf of targetUserId. ADMIN only. */
     @PostMapping("/walk-in")
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<BookingResponse> createWalkInBooking(@Valid @RequestBody WalkInBookingRequest request) {
-        BookingRequest bookingRequest = new BookingRequest(request.stationId(), request.startTime(), request.endTime());
-        BookingResponse response = bookingService.createBooking(request.targetUserId(), bookingRequest, BookingSource.WALK_IN);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BookingResponse> createWalkInBooking(
+            @RequestBody WalkInBookingRequest request,
+            @RequestHeader("X-User-Id") UUID callerId,
+            @RequestHeader("X-User-Role") String callerRole) {
+
+        // defensive check if you want an explicit guard in case method security isn't active
+        if (!"ADMIN".equalsIgnoreCase(callerRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can create walk-in bookings");
+        }
+
+        BookingResponse response = bookingService.createBooking(
+                request.targetUserId(),
+                new BookingRequest(request.stationId(), request.startTime(), request.endTime()),
+                BookingSource.WALK_IN
+        );
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
