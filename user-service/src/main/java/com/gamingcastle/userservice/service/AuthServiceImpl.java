@@ -2,12 +2,14 @@ package com.gamingcastle.userservice.service;
 
 import com.gamingcastle.userservice.dto.response.AuthResponse;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
+import com.gamingcastle.userservice.dto.request.PhoneLoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.AccountLockedException;
 import com.gamingcastle.userservice.exception.EmailAlreadyExistsException;
 import com.gamingcastle.userservice.exception.InvalidCredentialsException;
+import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.util.JwtUtil;
 import org.slf4j.Logger;
@@ -54,6 +56,12 @@ public class AuthServiceImpl implements AuthService {
             throw new EmailAlreadyExistsException();
         }
 
+        String phoneNumber = request.phoneNumber() != null ? request.phoneNumber().trim() : null;
+        if (phoneNumber != null && !phoneNumber.isBlank() && userRepository.existsByPhoneNumber(phoneNumber)) {
+            log.warn("Registration failed - phone number already exists: {}", phoneNumber);
+            throw new PhoneAlreadyExistsException();
+        }
+
         User user = User.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
@@ -86,19 +94,44 @@ public class AuthServiceImpl implements AuthService {
                     return new InvalidCredentialsException();
                 });
 
+        return authenticate(user, request.password());
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse loginByPhone(PhoneLoginRequest request) {
+
+        String phoneNumber = request.phoneNumber().trim();
+        log.info("Login attempt for phone number: {}", phoneNumber);
+
+        User user = userRepository.findByPhoneNumber(phoneNumber)
+                .orElseThrow(() -> {
+                    log.warn("Login failed - user not found for phone number: {}", phoneNumber);
+                    return new InvalidCredentialsException();
+                });
+
+        return authenticate(user, request.password());
+    }
+
+    /**
+     * FR-03/FR-06: shared credential-check + lockout logic used by both the
+     * email login (FR-01/FR-02 flow) and the phone-number login (FR-03).
+     */
+    private AuthResponse authenticate(User user, String rawPassword) {
+
         if (user.isLocked()) {
-            log.warn("Login rejected - account is locked for email: {}", email);
+            log.warn("Login rejected - account is locked for user: {}", user.getEmail());
             throw new AccountLockedException();
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
 
-            log.warn("Login failed - invalid password for email: {}", email);
+            log.warn("Login failed - invalid password for user: {}", user.getEmail());
             registerFailedAttempt(user);
-            log.info("Failed login attempts for {}: {}",email,user.getFailedLoginAttempts());
+            log.info("Failed login attempts for {}: {}", user.getEmail(), user.getFailedLoginAttempts());
 
             if (user.isLocked()) {
-                log.warn("Account locked due to repeated failed login attempts: {}", email);
+                log.warn("Account locked due to repeated failed login attempts: {}", user.getEmail());
             }
 
             throw new InvalidCredentialsException();
@@ -109,13 +142,13 @@ public class AuthServiceImpl implements AuthService {
         user.setLockedUntil(null);
         userRepository.save(user);
 
-        log.info("Login successful for user: {} with role: {}", email, user.getRole());
+        log.info("Login successful for user: {} with role: {}", user.getEmail(), user.getRole());
 
         String token = jwtUtil.generateToken(user);
 
-        log.debug("JWT token generated successfully for user: {}", email);
+        log.debug("JWT token generated successfully for user: {}", user.getEmail());
 
-        return AuthResponse.of(token,user.getId().toString(),user.getEmail(),user.getRole().name());
+        return AuthResponse.of(token, user.getId().toString(), user.getEmail(), user.getRole().name());
     }
 
     private void registerFailedAttempt(User user) {

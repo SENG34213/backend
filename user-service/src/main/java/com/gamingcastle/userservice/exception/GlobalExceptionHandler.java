@@ -66,6 +66,24 @@ public class GlobalExceptionHandler {
                         HttpStatus.LOCKED, request.getRequestURI()));
     }
 
+    @ExceptionHandler(PhoneAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handlePhoneAlreadyExists(PhoneAlreadyExistsException ex,
+                                                                  HttpServletRequest request) {
+        log.warn("Phone number already exists at {}: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of(ErrorCodes.PHONE_TAKEN, ex.getMessage(),
+                        HttpStatus.CONFLICT, request.getRequestURI()));
+    }
+
+    @ExceptionHandler(InvalidResetCodeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidResetCode(InvalidResetCodeException ex,
+                                                                HttpServletRequest request) {
+        log.warn("Invalid password reset code at {}", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(ErrorCodes.INVALID_RESET_CODE, ex.getMessage(),
+                        HttpStatus.BAD_REQUEST, request.getRequestURI()));
+    }
+
     @ExceptionHandler(UserAlreadyDeactivatedException.class)
     public ResponseEntity<ErrorResponse> handleUserAlreadyDeactivated(UserAlreadyDeactivatedException ex,
                                                                       HttpServletRequest request) {
