@@ -2,6 +2,7 @@ package com.gamingcastle.userservice.service;
 
 import com.gamingcastle.userservice.dto.response.AuthResponse;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
+import com.gamingcastle.userservice.dto.request.PhoneLoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
@@ -139,6 +140,45 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("locked");
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    // --- FR-03: phone-number login ---
+
+    @Test
+    void loginByPhone_shouldReturnToken_givenValidCredentials() {
+        // Arrange
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email("player@example.com")
+                .phoneNumber("0771234567")
+                .passwordHash("hashed-password")
+                .role(Role.CUSTOMER)
+                .failedLoginAttempts(0)
+                .build();
+        PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
+
+        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
+        when(jwtUtil.generateToken(user)).thenReturn("mock-jwt-token");
+
+        // Act
+        AuthResponse response = authService.loginByPhone(request);
+
+        // Assert
+        assertThat(response.accessToken()).isEqualTo("mock-jwt-token");
+        assertThat(user.getFailedLoginAttempts()).isZero();
+    }
+
+    @Test
+    void loginByPhone_shouldRejectInvalidCredentials_givenUnknownPhoneNumber() {
+        // Arrange
+        PhoneLoginRequest request = new PhoneLoginRequest("0000000000", "password123");
+        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.loginByPhone(request))
+                .isInstanceOf(RuntimeException.class);
         verify(passwordEncoder, never()).matches(any(), any());
     }
 }

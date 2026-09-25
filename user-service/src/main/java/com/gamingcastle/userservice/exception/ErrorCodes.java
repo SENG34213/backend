@@ -8,7 +8,9 @@ public final class ErrorCodes {
 
     // --- auth ---
     public static final String EMAIL_TAKEN = "EMAIL_TAKEN";
+    public static final String PHONE_TAKEN = "PHONE_TAKEN";
     public static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
+    public static final String INVALID_RESET_CODE = "INVALID_RESET_CODE";
     public static final String ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
     public static final String ACCOUNT_DISABLED = "ACCOUNT_DISABLED";
     public static final String INVALID_TOKEN = "INVALID_TOKEN";

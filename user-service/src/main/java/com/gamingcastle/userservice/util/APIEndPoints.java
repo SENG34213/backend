@@ -15,6 +15,9 @@ public final class APIEndPoints {
     // ---- auth endpoints ----
     public static final String login = "/login";
     public static final String register = "/register";
+    public static final String loginByPhone = login + "/phone";           // FR-03
+    public static final String forgotPassword = "/password/forgot";       // FR-04/FR-05
+    public static final String resetPassword = "/password/reset";         // FR-04/FR-05
 
     // ---- user endpoints ----
     public static final String users = "/users";
