@@ -43,7 +43,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable()) // stateless JWT API, no cookies/CSRF risk
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/actuator/**").permitAll()
+                .requestMatchers("/api/auth/**", "/actuator/**", "/api/auth/password/forgot", "/api/auth/password/reset").permitAll()
                 .requestMatchers(
                         "/swagger-ui/**",
                         "/swagger-ui.html",

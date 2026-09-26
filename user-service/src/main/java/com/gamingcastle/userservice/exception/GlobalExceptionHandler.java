@@ -84,6 +84,16 @@ public class GlobalExceptionHandler {
                         HttpStatus.BAD_REQUEST, request.getRequestURI()));
     }
 
+    @ExceptionHandler(NotificationDeliveryException.class)
+    public ResponseEntity<ErrorResponse> handleNotificationDeliveryFailed(NotificationDeliveryException ex,
+                                                                          HttpServletRequest request) {
+        log.error("Notification delivery failed at {}: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ErrorResponse.of(ErrorCodes.NOTIFICATION_DELIVERY_FAILED,
+                        "Could not send the verification code right now. Please try again shortly.",
+                        HttpStatus.BAD_GATEWAY, request.getRequestURI()));
+    }
+
     @ExceptionHandler(UserAlreadyDeactivatedException.class)
     public ResponseEntity<ErrorResponse> handleUserAlreadyDeactivated(UserAlreadyDeactivatedException ex,
                                                                       HttpServletRequest request) {
