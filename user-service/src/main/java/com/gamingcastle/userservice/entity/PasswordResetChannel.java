@@ -1,4 +1,9 @@
 package com.gamingcastle.userservice.entity;
 
-public class PasswordResetChannel {
+/**
+ * FR-04/FR-05: which channel a password-reset code was delivered on.
+ */
+public enum PasswordResetChannel {
+    EMAIL,
+    PHONE
 }
