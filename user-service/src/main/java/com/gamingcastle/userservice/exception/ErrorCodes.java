@@ -29,6 +29,7 @@ public final class ErrorCodes {
     public static final String TYPE_MISMATCH = "TYPE_MISMATCH";
     public static final String METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";
+    public static final String NOTIFICATION_DELIVERY_FAILED = "NOTIFICATION_DELIVERY_FAILED";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
     // --- default messages shared by more than one class ---

@@ -104,7 +104,8 @@ public class GatewayAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean isPublicPath(String path) {
         return path.startsWith("/api/auth/register")
-                || path.startsWith("/api/auth/login")
+                || path.startsWith("/api/auth/login")     // also covers /api/auth/login/phone (FR-03)
+                || path.startsWith("/api/auth/password")  // covers /forgot and /reset (FR-04/FR-05)
                 || path.startsWith("/actuator")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs");
