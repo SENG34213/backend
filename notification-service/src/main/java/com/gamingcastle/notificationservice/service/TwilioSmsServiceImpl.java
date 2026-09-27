@@ -1,7 +1,6 @@
-package com.gamingcastle.userservice.service;
+package com.gamingcastle.notificationservice.service;
 
-import com.gamingcastle.userservice.exception.NotificationDeliveryException;
-import com.gamingcastle.userservice.util.PhoneNumberUtil;
+
 import com.twilio.exception.ApiException;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
@@ -33,13 +32,20 @@ public class TwilioSmsServiceImpl implements SmsService {
 
     @Override
     public void send(String toPhoneNumber, String message) {
-        String e164 = PhoneNumberUtil.toE164(toPhoneNumber, defaultCountryCode);
+        String e164 = toE164(toPhoneNumber, defaultCountryCode);
         try {
             Message.creator(new PhoneNumber(e164), new PhoneNumber(fromNumber), message).create();
             log.info("Password reset SMS dispatched to {}", e164);
         } catch (ApiException ex) {
             log.error("Failed to send password reset SMS to {}: {}", e164, ex.getMessage());
-            throw new NotificationDeliveryException("Unable to send verification SMS", ex);
+            throw new RuntimeException("Unable to send verification SMS", ex);
         }
+    }
+
+    private String toE164(String phone, String defaultCode) {
+        if (phone == null || phone.isBlank()) return phone;
+        if (phone.startsWith("+")) return phone;
+        if (phone.startsWith("0")) return defaultCode + phone.substring(1);
+        return defaultCode + phone;
     }
 }
