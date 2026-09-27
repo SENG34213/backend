@@ -1,0 +1,34 @@
+services:
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/gamingcastle_users
+      DB_USER: ${DB_USER:-gc_admin}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      EUREKA_CLIENT_ENABLED: "false"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET:?Set GATEWAY_INTERNAL_SECRET in .env}
+    ports:
+      - "8081:8081"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gamingcastle_users
+      POSTGRES_USER: ${DB_USER:-gc_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - user-service-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  user-service-postgres-data:
