@@ -146,6 +146,11 @@ public class BookingServiceImpl implements BookingService {
         booking.setEndTime(request.endTime());
         
         booking = bookingRepository.save(booking);
+        return BookingResponse.from(booking);
+    }
+
+    @Override
+    @Transactional
     public BookingResponse confirmBooking(UUID bookingId, UUID paymentId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException(
