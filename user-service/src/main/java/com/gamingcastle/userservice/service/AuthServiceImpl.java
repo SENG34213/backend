@@ -12,6 +12,7 @@ import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.util.JwtUtil;
+import com.gamingcastle.userservice.client.NotificationClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,11 +37,13 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final NotificationClient notificationClient;
 
-    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, NotificationClient notificationClient) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.notificationClient = notificationClient;
     }
 
     @Override
@@ -77,6 +80,12 @@ public class AuthServiceImpl implements AuthService {
         String token = jwtUtil.generateToken(user);
 
         log.debug("JWT token generated successfully for newly registered user: {}",user.getEmail());
+
+        try {
+            notificationClient.sendWelcomeEmail(user.getEmail(), user.getFullName());
+        } catch (Exception e) {
+            log.error("Failed to send welcome email to {}: {}", user.getEmail(), e.getMessage());
+        }
 
         return AuthResponse.of(token,user.getId().toString(),user.getEmail(),user.getRole().name());
     }

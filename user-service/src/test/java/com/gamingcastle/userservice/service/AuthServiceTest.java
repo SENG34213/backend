@@ -8,6 +8,7 @@ import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.util.JwtUtil;
+import com.gamingcastle.userservice.client.NotificationClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -33,13 +34,14 @@ class AuthServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtUtil jwtUtil;
+    @Mock private NotificationClient notificationClient;
 
     private AuthService authService; // depend on the interface, same as AuthController does
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        authService = new AuthServiceImpl(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthServiceImpl(userRepository, passwordEncoder, jwtUtil, notificationClient);
     }
 
     @Test
