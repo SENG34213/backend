@@ -34,4 +34,12 @@ public interface BookingService {
      * Reschedule an existing CONFIRMED booking
      */
     BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request);
+
+    /**
+     * Confirms a pending booking after successful payment.
+     *
+     * @param bookingId the booking being confirmed
+     * @param paymentId the payment associated with the successful payment
+     */
+    BookingResponse confirmBooking(UUID bookingId, UUID paymentId);
 }

@@ -3,6 +3,7 @@ package com.gamingcastle.bookingservice.controller;
 import com.gamingcastle.bookingservice.config.GatewayHeaderAuthFilter;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
+import com.gamingcastle.bookingservice.dto.ConfirmBookingRequest;
 import com.gamingcastle.bookingservice.dto.WalkInBookingRequest;
 import com.gamingcastle.bookingservice.entity.BookingSource;
 import com.gamingcastle.bookingservice.service.BookingService;
@@ -122,6 +123,19 @@ public class BookingController {
                 response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
         }
         
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/confirm")
+    public ResponseEntity<BookingResponse> confirmBooking(
+            @PathVariable UUID id,
+            @Valid @RequestBody ConfirmBookingRequest request
+    ) {
+        BookingResponse response = bookingService.confirmBooking(
+                id,
+                request.paymentId()
+        );
+
         return ResponseEntity.ok(response);
     }
 }

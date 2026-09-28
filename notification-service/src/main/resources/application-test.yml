@@ -1,0 +1,12 @@
+# Activated in CI via SPRING_PROFILES_ACTIVE=test (see backend/.github/workflows/ci.yml).
+# Points integration tests at the CI's disposable Postgres container instead
+# of the dev database — see CI-2 in the foundation development plan.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_test}
+    username: ${DB_USER:test}
+    password: ${DB_PASSWORD:test}
+
+eureka:
+  client:
+    enabled: false   # integration tests don't need service discovery running

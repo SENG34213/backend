@@ -8,6 +8,7 @@ import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.InvalidResetCodeException;
 import com.gamingcastle.userservice.repository.PasswordResetTokenRepository;
 import com.gamingcastle.userservice.repository.UserRepository;
+import com.gamingcastle.userservice.client.NotificationClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,16 +35,16 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationService notificationService;
+    private final NotificationClient notificationClient;
 
     public PasswordResetServiceImpl(UserRepository userRepository,
                                     PasswordResetTokenRepository tokenRepository,
                                     PasswordEncoder passwordEncoder,
-                                    NotificationService notificationService) {
+                                    NotificationClient notificationClient) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
-        this.notificationService = notificationService;
+        this.notificationClient = notificationClient;
     }
 
     @Override
@@ -79,9 +80,9 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         log.info("Password reset code issued for user: {} via {}", user.getId(), channel);
 
         if (channel == PasswordResetChannel.EMAIL) {
-            notificationService.sendPasswordResetEmail(user.getEmail(), code);
+            notificationClient.sendPasswordResetEmail(user.getEmail(), code);
         } else {
-            notificationService.sendPasswordResetSms(user.getPhoneNumber(), code);
+            notificationClient.sendPasswordResetSms(user.getPhoneNumber(), code);
         }
     }
 
