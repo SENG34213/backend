@@ -30,4 +30,12 @@ public interface BookingService {
      *                      cancel any booking, customers only their own
      */
     BookingResponse cancelBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin);
+
+    /**
+     * Confirms a pending booking after successful payment.
+     *
+     * @param bookingId the booking being confirmed
+     * @param paymentId the payment associated with the successful payment
+     */
+    BookingResponse confirmBooking(UUID bookingId, UUID paymentId);
 }

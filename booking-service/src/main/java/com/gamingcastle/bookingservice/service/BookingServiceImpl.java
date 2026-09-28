@@ -98,4 +98,30 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         return BookingResponse.from(booking);
     }
+
+    @Override
+    @Transactional
+    public BookingResponse confirmBooking(UUID bookingId, UUID paymentId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException(
+                        HttpStatus.NOT_FOUND,
+                        "BOOKING_NOT_FOUND",
+                        "No booking exists with id " + bookingId
+                ));
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BookingException(
+                    HttpStatus.CONFLICT,
+                    "BOOKING_NOT_PENDING",
+                    "Only pending bookings can be confirmed"
+            );
+        }
+
+        booking.setPaymentId(paymentId);
+        booking.setStatus(BookingStatus.CONFIRMED);
+
+        booking = bookingRepository.save(booking);
+
+        return BookingResponse.from(booking);
+    }
 }
