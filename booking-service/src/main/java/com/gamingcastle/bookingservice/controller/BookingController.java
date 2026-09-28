@@ -7,6 +7,7 @@ import com.gamingcastle.bookingservice.dto.ConfirmBookingRequest;
 import com.gamingcastle.bookingservice.dto.WalkInBookingRequest;
 import com.gamingcastle.bookingservice.entity.BookingSource;
 import com.gamingcastle.bookingservice.service.BookingService;
+import com.gamingcastle.bookingservice.client.NotificationClient;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,9 +28,11 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final NotificationClient notificationClient;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService, NotificationClient notificationClient) {
         this.bookingService = bookingService;
+        this.notificationClient = notificationClient;
     }
 
     /** FR-08: customer self-service booking. */
@@ -37,8 +40,17 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
             @Valid @RequestBody BookingRequest request,
-            @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId) {
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId,
+            @RequestHeader(value = "X-User-Email", required = false) String email,
+            @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
         BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        
+        if (email != null && !email.isBlank()) {
+            notificationClient.sendBookingConfirmation(new NotificationClient.BookingEmailRequest(
+                email, fullName, response.id().toString(), response.stationCode(), 
+                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+        }
+        
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -77,9 +89,40 @@ public class BookingController {
     public ResponseEntity<BookingResponse> cancelBooking(
             @PathVariable("id") UUID bookingId,
             @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId,
-            @RequestHeader(GatewayHeaderAuthFilter.USER_ROLE_HEADER) String role) {
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ROLE_HEADER) String role,
+            @RequestHeader(value = "X-User-Email", required = false) String email,
+            @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
         boolean isAdmin = "ADMIN".equals(role);
         BookingResponse response = bookingService.cancelBooking(bookingId, userId, isAdmin);
+        
+        if (email != null && !email.isBlank()) {
+            notificationClient.sendBookingCancelled(new NotificationClient.BookingEmailRequest(
+                email, fullName, response.id().toString(), response.stationCode(), 
+                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /** Reschedule an existing CONFIRMED booking */
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
+    @PatchMapping("/{id}/reschedule")
+    public ResponseEntity<BookingResponse> rescheduleBooking(
+            @PathVariable("id") UUID bookingId,
+            @Valid @RequestBody BookingRequest request,
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId,
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ROLE_HEADER) String role,
+            @RequestHeader(value = "X-User-Email", required = false) String email,
+            @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
+        boolean isAdmin = "ADMIN".equals(role);
+        BookingResponse response = bookingService.rescheduleBooking(bookingId, userId, isAdmin, request);
+        
+        if (email != null && !email.isBlank()) {
+            notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
+                email, fullName, response.id().toString(), response.stationCode(), 
+                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+        }
+        
         return ResponseEntity.ok(response);
     }
 

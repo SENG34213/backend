@@ -69,10 +69,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
             String userId = claims.getSubject();
             String role = claims.get("role", String.class);
+            String email = claims.get("email", String.class);
+            String fullName = claims.get("fullName", String.class);
 
             ServerHttpRequest mutatedRequest = request.mutate()
                     .header("X-User-Id", userId)
                     .header("X-User-Role", role)
+                    .header("X-User-Email", email != null ? email : "")
+                    .header("X-User-FullName", fullName != null ? fullName : "")
                     .header("X-Gateway-Secret", gatewayInternalSecret)
                     .build();
 
