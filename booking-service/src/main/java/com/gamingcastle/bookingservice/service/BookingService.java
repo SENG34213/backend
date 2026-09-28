@@ -30,4 +30,8 @@ public interface BookingService {
      *                      cancel any booking, customers only their own
      */
     BookingResponse cancelBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin);
+    /**
+     * Reschedule an existing CONFIRMED booking
+     */
+    BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request);
 }

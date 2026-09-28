@@ -98,4 +98,54 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         return BookingResponse.from(booking);
     }
+
+    @Override
+    @Transactional
+    public BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND",
+                        "No booking exists with id " + bookingId));
+
+        if (!callerIsAdmin && !booking.getUserId().equals(callerId)) {
+            throw new BookingException(HttpStatus.FORBIDDEN, "NOT_YOUR_BOOKING",
+                    "You can only reschedule your own bookings");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BookingException(HttpStatus.CONFLICT, "INVALID_STATUS",
+                    "Only CONFIRMED bookings can be rescheduled");
+        }
+
+        if (!request.endTime().isAfter(request.startTime())) {
+            throw new BookingException(HttpStatus.BAD_REQUEST, "INVALID_TIME_RANGE",
+                    "endTime must be after startTime");
+        }
+
+        GameStation station = gameStationRepository.findById(request.stationId())
+                .orElseThrow(() -> new BookingException(HttpStatus.NOT_FOUND, "STATION_NOT_FOUND",
+                        "No game station exists with id " + request.stationId()));
+
+        if (!station.isActive()) {
+            throw new BookingException(HttpStatus.CONFLICT, "STATION_INACTIVE",
+                    "Station " + station.getStationCode() + " is not currently active");
+        }
+
+        List<Booking> conflicts = bookingRepository.findOverlapping(
+                station.getId(), request.startTime(), request.endTime());
+        
+        boolean hasConflict = conflicts.stream()
+                .anyMatch(b -> !b.getId().equals(bookingId));
+
+        if (hasConflict) {
+            throw new BookingException(HttpStatus.CONFLICT, "SLOT_UNAVAILABLE",
+                    "Station " + station.getStationCode() + " is already booked for part of that time range");
+        }
+
+        booking.setStation(station);
+        booking.setStartTime(request.startTime());
+        booking.setEndTime(request.endTime());
+        
+        booking = bookingRepository.save(booking);
+        return BookingResponse.from(booking);
+    }
 }
