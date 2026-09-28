@@ -5,9 +5,9 @@ spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/gamingcastle_users
-    username: gc_admin
-    password: gc_password
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/gamingcastle_users}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate   # Flyway owns the schema, not Hibernate — see db/migration
