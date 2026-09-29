@@ -183,14 +183,56 @@ public class NotificationService {
         String htmlBody = """
             <!DOCTYPE html>
             <html>
-            <head><meta charset="UTF-8"><title>Booking Confirmation</title></head>
-            <body style="font-family:Arial, sans-serif; padding:20px;">
-                <h2>Hi %s,</h2>
-                <p>Your booking (ID: %s) has been successfully confirmed!</p>
-                <p><strong>Game Station:</strong> %s</p>
-                <p><strong>Date:</strong> %s</p>
-                <p><strong>Time Slot:</strong> %s</p>
-                <p>We look forward to hosting you!</p>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Booking Confirmation</title>
+            </head>
+            <body style="margin:0; padding:0; background-color:#f4f4f7; font-family:Arial, Helvetica, sans-serif;">
+
+                <div style="max-width:600px; margin:40px auto; padding:20px;">
+
+                    <div style="background-color:#1a1a2e; padding:30px; text-align:center;
+                                border-radius:12px 12px 0 0;">
+                        <h1 style="margin:0; color:#ffffff; font-size:28px;">
+                            🎮 Gaming Castle
+                        </h1>
+                        <p style="margin:8px 0 0; color:#c7c7d9; font-size:14px;">
+                            Booking Confirmation
+                        </p>
+                    </div>
+
+                    <div style="background-color:#ffffff; padding:40px 30px;
+                                border-radius:0 0 12px 12px;">
+
+                        <h2 style="margin-top:0; color:#222222;">
+                            Hi %s,
+                        </h2>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            Your booking (ID: <strong>%s</strong>) has been successfully confirmed!
+                        </p>
+
+                        <div style="margin:25px 0; padding:20px; background-color:#f8f9fa; border-radius:8px; border-left:4px solid #6c63ff;">
+                            <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Game Station:</strong> %s</p>
+                            <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Date:</strong> %s</p>
+                            <p style="margin:0; color:#444444; font-size:15px;"><strong>Time Slot:</strong> %s</p>
+                        </div>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            We look forward to hosting you!
+                        </p>
+
+                        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+
+                        <p style="margin:0; color:#999999; font-size:12px; text-align:center;">
+                            © Gaming Castle. All rights reserved.
+                        </p>
+
+                    </div>
+
+                </div>
+
             </body>
             </html>
             """.formatted(request.customerName(), request.bookingId(), request.gameStationName(), request.bookingDate(), request.timeSlot());
@@ -208,13 +250,56 @@ public class NotificationService {
         String htmlBody = """
             <!DOCTYPE html>
             <html>
-            <head><meta charset="UTF-8"><title>Booking Rescheduled</title></head>
-            <body style="font-family:Arial, sans-serif; padding:20px;">
-                <h2>Hi %s,</h2>
-                <p>Your booking (ID: %s) has been successfully rescheduled.</p>
-                <p><strong>New Game Station:</strong> %s</p>
-                <p><strong>New Date:</strong> %s</p>
-                <p><strong>New Time Slot:</strong> %s</p>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Booking Rescheduled</title>
+            </head>
+            <body style="margin:0; padding:0; background-color:#f4f4f7; font-family:Arial, Helvetica, sans-serif;">
+
+                <div style="max-width:600px; margin:40px auto; padding:20px;">
+
+                    <div style="background-color:#1a1a2e; padding:30px; text-align:center;
+                                border-radius:12px 12px 0 0;">
+                        <h1 style="margin:0; color:#ffffff; font-size:28px;">
+                            🎮 Gaming Castle
+                        </h1>
+                        <p style="margin:8px 0 0; color:#c7c7d9; font-size:14px;">
+                            Booking Rescheduled
+                        </p>
+                    </div>
+
+                    <div style="background-color:#ffffff; padding:40px 30px;
+                                border-radius:0 0 12px 12px;">
+
+                        <h2 style="margin-top:0; color:#222222;">
+                            Hi %s,
+                        </h2>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            Your booking (ID: <strong>%s</strong>) has been successfully rescheduled.
+                        </p>
+
+                        <div style="margin:25px 0; padding:20px; background-color:#f8f9fa; border-radius:8px; border-left:4px solid #6c63ff;">
+                            <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>New Game Station:</strong> %s</p>
+                            <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>New Date:</strong> %s</p>
+                            <p style="margin:0; color:#444444; font-size:15px;"><strong>New Time Slot:</strong> %s</p>
+                        </div>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            We look forward to seeing you at the new time!
+                        </p>
+
+                        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+
+                        <p style="margin:0; color:#999999; font-size:12px; text-align:center;">
+                            © Gaming Castle. All rights reserved.
+                        </p>
+
+                    </div>
+
+                </div>
+
             </body>
             </html>
             """.formatted(request.customerName(), request.bookingId(), request.gameStationName(), request.bookingDate(), request.timeSlot());
@@ -232,11 +317,50 @@ public class NotificationService {
         String htmlBody = """
             <!DOCTYPE html>
             <html>
-            <head><meta charset="UTF-8"><title>Booking Cancelled</title></head>
-            <body style="font-family:Arial, sans-serif; padding:20px;">
-                <h2>Hi %s,</h2>
-                <p>Your booking (ID: %s) on %s at %s has been cancelled.</p>
-                <p>If this was a mistake or you wish to re-book, please visit our platform.</p>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Booking Cancelled</title>
+            </head>
+            <body style="margin:0; padding:0; background-color:#f4f4f7; font-family:Arial, Helvetica, sans-serif;">
+
+                <div style="max-width:600px; margin:40px auto; padding:20px;">
+
+                    <div style="background-color:#1a1a2e; padding:30px; text-align:center;
+                                border-radius:12px 12px 0 0;">
+                        <h1 style="margin:0; color:#ffffff; font-size:28px;">
+                            🎮 Gaming Castle
+                        </h1>
+                        <p style="margin:8px 0 0; color:#c7c7d9; font-size:14px;">
+                            Booking Cancelled
+                        </p>
+                    </div>
+
+                    <div style="background-color:#ffffff; padding:40px 30px;
+                                border-radius:0 0 12px 12px;">
+
+                        <h2 style="margin-top:0; color:#222222;">
+                            Hi %s,
+                        </h2>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            Your booking (ID: <strong>%s</strong>) on <strong>%s</strong> at <strong>%s</strong> has been cancelled.
+                        </p>
+
+                        <p style="color:#777777; font-size:14px; line-height:1.6; margin-top:20px;">
+                            If this was a mistake or you wish to re-book, please visit our platform.
+                        </p>
+
+                        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+
+                        <p style="margin:0; color:#999999; font-size:12px; text-align:center;">
+                            © Gaming Castle. All rights reserved.
+                        </p>
+
+                    </div>
+
+                </div>
+
             </body>
             </html>
             """.formatted(request.customerName(), request.bookingId(), request.bookingDate(), request.timeSlot());
