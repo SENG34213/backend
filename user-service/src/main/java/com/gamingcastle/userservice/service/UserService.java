@@ -13,6 +13,7 @@ public interface UserService {
     UserProfileResponse updateMyProfile(UUID userId, UpdateProfileRequest request);
     Page<UserSummaryResponse> getAllUsers(Pageable pageable);
     UserSummaryResponse getUserById(UUID userId);
-    void deactivateAccount(UUID userId);
+    void deactivateMyAccount(UUID userId);
+    void deactivateUser(UUID targetUserId, UUID adminId);
+    void activateUser(UUID userId);
 }
-

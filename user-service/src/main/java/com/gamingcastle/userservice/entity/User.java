@@ -51,8 +51,25 @@ public class User extends BaseEntity{
     @Builder.Default
     private boolean enabled = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "deactivated_by")
+    private DeactivatedBy deactivatedBy;
 
     public boolean isLocked() {
         return lockedUntil != null && lockedUntil.isAfter(Instant.now());
+    }
+
+    public void deactivate(DeactivatedBy by) {
+        this.enabled = false;
+        this.deactivatedBy = by;
+    }
+
+    public void activate() {
+        this.enabled = true;
+        this.deactivatedBy = null;
+    }
+
+    public boolean isSelfDeactivated() {
+        return !enabled && deactivatedBy == DeactivatedBy.SELF;
     }
 }

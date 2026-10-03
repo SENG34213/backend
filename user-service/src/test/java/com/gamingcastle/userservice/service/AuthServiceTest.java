@@ -4,9 +4,14 @@ import com.gamingcastle.userservice.dto.response.AuthResponse;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
 import com.gamingcastle.userservice.dto.request.PhoneLoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
+import com.gamingcastle.userservice.entity.DeactivatedBy;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
+import com.gamingcastle.userservice.exception.AccountDeactivatedByAdminException;
+import com.gamingcastle.userservice.exception.AccountDeactivatedException;
+import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.repository.UserRepository;
+import com.gamingcastle.userservice.service.impl.AuthServiceImpl;
 import com.gamingcastle.userservice.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -180,5 +185,77 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.loginByPhone(request))
                 .isInstanceOf(RuntimeException.class);
         verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    // --- account deactivation checks at login ---
+
+    private User deactivatedUser(DeactivatedBy by) {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email("player@example.com")
+                .phoneNumber("0771234567")
+                .passwordHash("hashed-password")
+                .role(Role.CUSTOMER)
+                .build();
+        user.deactivate(by);
+        return user;
+    }
+
+    @Test
+    void login_shouldRequireVerification_givenSelfDeactivatedAccount() {
+        User user = deactivatedUser(DeactivatedBy.SELF);
+        LoginRequest request = new LoginRequest("player@example.com", "password123");
+        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AccountDeactivatedException.class);
+        verifyNoInteractions(jwtUtil); // no token issued
+    }
+
+    @Test
+    void login_shouldShowAdminMessage_givenAdminDeactivatedAccount() {
+        User user = deactivatedUser(DeactivatedBy.ADMIN);
+        LoginRequest request = new LoginRequest("player@example.com", "password123");
+        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AccountDeactivatedByAdminException.class)
+                .hasMessageContaining("administrator");
+        verifyNoInteractions(jwtUtil);
+    }
+
+    @Test
+    void login_shouldNotRevealDeactivation_givenWrongPassword() {
+        User user = deactivatedUser(DeactivatedBy.SELF);
+        LoginRequest request = new LoginRequest("player@example.com", "wrong-password");
+        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void loginByPhone_shouldRequireVerification_givenSelfDeactivatedAccount() {
+        User user = deactivatedUser(DeactivatedBy.SELF);
+        PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
+        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.loginByPhone(request))
+                .isInstanceOf(AccountDeactivatedException.class);
+    }
+
+    @Test
+    void loginByPhone_shouldShowAdminMessage_givenAdminDeactivatedAccount() {
+        User user = deactivatedUser(DeactivatedBy.ADMIN);
+        PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
+        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.loginByPhone(request))
+                .isInstanceOf(AccountDeactivatedByAdminException.class);
     }
 }

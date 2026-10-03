@@ -1,4 +1,4 @@
-package com.gamingcastle.userservice.service;
+package com.gamingcastle.userservice.service.impl;
 
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
@@ -7,11 +7,14 @@ import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.UserAlreadyDeactivatedException;
 import com.gamingcastle.userservice.exception.UserNotFoundException;
 import com.gamingcastle.userservice.repository.UserRepository;
+import com.gamingcastle.userservice.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gamingcastle.userservice.entity.DeactivatedBy;
+import com.gamingcastle.userservice.exception.UserAlreadyActiveException;
 
 import java.util.UUID;
 
@@ -61,16 +64,56 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deactivateAccount(UUID userId) {
+    public void deactivateMyAccount(UUID userId) {
         User user = findByIdOrThrow(userId);
 
         if (!user.isEnabled()) {
             throw new UserAlreadyDeactivatedException(userId);
         }
-        user.setEnabled(false);
+        user.deactivate(DeactivatedBy.SELF);
         userRepository.save(user);
 
-        log.info("Account deactivated: userId={}", userId);
+        log.info("Account deactivated by the user: userId={}", userId);
+    }
+
+    @Override
+    @Transactional
+    public void deactivateUser(UUID targetUserId, UUID adminId) {
+        User user = findByIdOrThrow(targetUserId);
+
+        DeactivatedBy by = targetUserId.equals(adminId) ? DeactivatedBy.SELF : DeactivatedBy.ADMIN;
+
+        if (!user.isEnabled()) {
+            if (user.getDeactivatedBy() == DeactivatedBy.SELF && by == DeactivatedBy.ADMIN) {
+                user.deactivate(DeactivatedBy.ADMIN);
+                userRepository.save(user);
+                log.info("Self-deactivated account taken over by admin: targetUserId={}, adminId={}",
+                        targetUserId, adminId);
+                return;
+            }
+            throw new UserAlreadyDeactivatedException(targetUserId);
+        }
+
+        user.deactivate(by);
+        userRepository.save(user);
+
+        log.info("Account deactivated: targetUserId={}, by={}, adminId={}", targetUserId, by, adminId);
+    }
+
+    @Override
+    @Transactional
+    public void activateUser(UUID userId) {
+        User user = findByIdOrThrow(userId);
+
+        if (user.isEnabled()) {
+            throw new UserAlreadyActiveException(userId);
+        }
+        user.activate();
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+
+        log.info("Account reactivated by admin: userId={}", userId);
     }
 
     private User findByIdOrThrow(UUID id) {
@@ -96,7 +139,8 @@ public class UserServiceImpl implements UserService {
                 user.getPhoneNumber(),
                 user.getRole().name(),
                 user.isEnabled(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getDeactivatedBy()
         );
     }
 }
