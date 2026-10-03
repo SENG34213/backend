@@ -5,9 +5,9 @@ spring:
   application:
     name: booking-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/gamingcastle_bookings
-    username: gc_admin
-    password: gc_password
+    url: ${BOOKING_DB_URL}
+    username: ${BOOKING_DB_USER}
+    password: ${BOOKING_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate

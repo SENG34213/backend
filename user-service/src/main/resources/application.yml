@@ -5,9 +5,9 @@ spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/gamingcastle_users
-    username: gc_admin
-    password: gc_password
+    url: ${USER_DB_URL}
+    username: ${USER_DB_USER}
+    password: ${USER_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate   # Flyway owns the schema, not Hibernate — see db/migration
@@ -25,8 +25,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:jashva25@gmail.com}
-    password: ${MAIL_PASSWORD:cpruzdasbciwblug}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -45,15 +45,15 @@ eureka:
     prefer-ip-address: true
 
 jwt:
-  secret: ${JWT_SECRET:gaming-castle-dev-secret-change-me-in-production-min-256-bits}
+  secret: ${JWT_SECRET}
   expiration-ms: 900000   # 15 minutes, per ADR-07
 
 gateway:
-  internal-secret: ${GATEWAY_INTERNAL_SECRET:gaming-castle-dev-gateway-secret-change-me}
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}
 
 app:
   mail:
-    from: ${MAIL_FROM:jashva25@gmail.com}
+    from: ${MAIL_FROM:}
 
 # FR-05: Twilio delivery for password-reset SMS. default-country-code is used
 # to turn a locally-formatted number (e.g. 0771234567) into E.164 (+94771234567)
