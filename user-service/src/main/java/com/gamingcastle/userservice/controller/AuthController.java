@@ -13,9 +13,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.gamingcastle.userservice.dto.request.ConfirmReactivationRequest;
-import com.gamingcastle.userservice.dto.request.ReactivateAccountRequest;
-import com.gamingcastle.userservice.service.AccountReactivationService;
 
 /**
  * FR-01/FR-03/FR-04/FR-05: public auth endpoints. These are all listed as
@@ -27,14 +24,10 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
-    private final AccountReactivationService accountReactivationService;
 
-    public AuthController(AuthService authService,
-                          PasswordResetService passwordResetService,
-                          AccountReactivationService accountReactivationService) {
+    public AuthController(AuthService authService, PasswordResetService passwordResetService) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
-        this.accountReactivationService = accountReactivationService;
     }
 
     @PostMapping(APIEndPoints.register)
@@ -72,16 +65,5 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(request);
         return ResponseEntity.ok().build();
-    }
-
-    @PostMapping(APIEndPoints.reactivateRequest)
-    public ResponseEntity<Void> requestReactivation(@Valid @RequestBody ReactivateAccountRequest request) {
-        accountReactivationService.requestReactivation(request);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
-    }
-
-    @PostMapping(APIEndPoints.reactivateConfirm)
-    public ResponseEntity<AuthResponse> confirmReactivation(@Valid @RequestBody ConfirmReactivationRequest request) {
-        return ResponseEntity.ok(accountReactivationService.confirmReactivation(request));
     }
 }

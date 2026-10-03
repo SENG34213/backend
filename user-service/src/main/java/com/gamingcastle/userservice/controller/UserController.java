@@ -56,29 +56,19 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(userId));
     }
 
-    @PatchMapping(APIEndPoints.deactivateMe)
+    @DeleteMapping(APIEndPoints.profile)
     public ResponseEntity<Void> deactivateMyAccount(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId) {
         log.info("Account deactivation request: userId={}", userId);
-        userService.deactivateMyAccount(userId);
+        userService.deactivateAccount(userId);
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping(APIEndPoints.deactivateUser)
+    @DeleteMapping(APIEndPoints.userById)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deactivateUser(
-            @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID adminId,
-            @PathVariable UUID userId) {
-        log.info("Admin account deactivation: targetUserId={}, adminId={}", userId, adminId);
-        userService.deactivateUser(userId, adminId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PatchMapping(APIEndPoints.activateUser)
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> activateUser(@PathVariable UUID userId) {
-        log.info("Admin account activation: targetUserId={}", userId);
-        userService.activateUser(userId);
+    public ResponseEntity<Void> deactivateUser(@PathVariable UUID userId) {
+        log.info("Admin account deactivation: targetUserId={}", userId);
+        userService.deactivateAccount(userId);
         return ResponseEntity.noContent().build();
     }
 }

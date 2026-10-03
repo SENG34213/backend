@@ -12,8 +12,6 @@ public final class ErrorCodes {
     public static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
     public static final String INVALID_RESET_CODE = "INVALID_RESET_CODE";
     public static final String ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
-    public static final String ACCOUNT_DEACTIVATED = "ACCOUNT_DEACTIVATED";
-    public static final String ACCOUNT_DEACTIVATED_BY_ADMIN = "ACCOUNT_DEACTIVATED_BY_ADMIN";
     public static final String ACCOUNT_DISABLED = "ACCOUNT_DISABLED";
     public static final String INVALID_TOKEN = "INVALID_TOKEN";
     public static final String UNAUTHORIZED = "UNAUTHORIZED";
@@ -21,7 +19,6 @@ public final class ErrorCodes {
     // --- user ---
     public static final String USER_NOT_FOUND = "USER_NOT_FOUND";
     public static final String USER_ALREADY_DEACTIVATED = "USER_ALREADY_DEACTIVATED";
-    public static final String USER_ALREADY_ACTIVE = "USER_ALREADY_ACTIVE";
     public static final String FORBIDDEN = "FORBIDDEN";
 
     // --- generic / request level ---

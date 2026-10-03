@@ -1,7 +1,5 @@
 package com.gamingcastle.userservice.dto.response;
 
-import com.gamingcastle.userservice.entity.DeactivatedBy;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -12,6 +10,5 @@ public record UserSummaryResponse(
         String phoneNumber,
         String role,
         boolean enabled,
-        Instant createdAt,
-        DeactivatedBy deactivatedBy
+        Instant createdAt
 ) {}

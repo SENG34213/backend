@@ -1,4 +1,4 @@
-package com.gamingcastle.userservice.service.impl;
+package com.gamingcastle.userservice.service;
 
 import com.gamingcastle.userservice.dto.response.AuthResponse;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
@@ -11,12 +11,9 @@ import com.gamingcastle.userservice.exception.EmailAlreadyExistsException;
 import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
 import com.gamingcastle.userservice.repository.UserRepository;
-import com.gamingcastle.userservice.service.AuthService;
 import com.gamingcastle.userservice.util.JwtUtil;
-import com.gamingcastle.userservice.exception.AccountDeactivatedByAdminException;
-import com.gamingcastle.userservice.exception.AccountDeactivatedException;
-
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,11 +27,11 @@ import java.time.temporal.ChronoUnit;
  * spinning up the web layer (see the course's unit test standards, §6.3.1).
  */
 @Service
-@Slf4j
 public class AuthServiceImpl implements AuthService {
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 15;
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -138,16 +135,6 @@ public class AuthServiceImpl implements AuthService {
             }
 
             throw new InvalidCredentialsException();
-        }
-
-        // Password correct, aana account switch-off
-        if (!user.isEnabled()) {
-            if (user.isSelfDeactivated()) {
-                log.warn("Login rejected - account deactivated by the user, verification required: {}", user.getEmail());
-                throw new AccountDeactivatedException();
-            }
-            log.warn("Login rejected - account deactivated by an admin: {}", user.getEmail());
-            throw new AccountDeactivatedByAdminException();
         }
 
         // Successful login resets the failed-attempt counter

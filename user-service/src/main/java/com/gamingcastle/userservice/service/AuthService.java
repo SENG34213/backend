@@ -4,7 +4,6 @@ import com.gamingcastle.userservice.dto.response.AuthResponse;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
 import com.gamingcastle.userservice.dto.request.PhoneLoginRequest;
 import com.gamingcastle.userservice.dto.request.RegisterRequest;
-import com.gamingcastle.userservice.service.impl.AuthServiceImpl;
 
 /**
  * FR-01–FR-06: registration, login, and account-lockout contract.

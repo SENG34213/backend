@@ -102,31 +102,4 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ErrorCodes.USER_ALREADY_DEACTIVATED, ex.getMessage(),
                         HttpStatus.CONFLICT, request.getRequestURI()));
     }
-
-    @ExceptionHandler(AccountDeactivatedException.class)
-    public ResponseEntity<ErrorResponse> handleAccountDeactivated(AccountDeactivatedException ex,
-                                                                  HttpServletRequest request) {
-        log.warn("Login rejected - self-deactivated account at {}", request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse.of(ErrorCodes.ACCOUNT_DEACTIVATED, ex.getMessage(),
-                        HttpStatus.FORBIDDEN, request.getRequestURI()));
-    }
-
-    @ExceptionHandler(AccountDeactivatedByAdminException.class)
-    public ResponseEntity<ErrorResponse> handleAccountDeactivatedByAdmin(AccountDeactivatedByAdminException ex,
-                                                                         HttpServletRequest request) {
-        log.warn("Login rejected - admin-deactivated account at {}", request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse.of(ErrorCodes.ACCOUNT_DEACTIVATED_BY_ADMIN, ex.getMessage(),
-                        HttpStatus.FORBIDDEN, request.getRequestURI()));
-    }
-
-    @ExceptionHandler(UserAlreadyActiveException.class)
-    public ResponseEntity<ErrorResponse> handleUserAlreadyActive(UserAlreadyActiveException ex,
-                                                                 HttpServletRequest request) {
-        log.warn("Activation rejected at {}: {}", request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ErrorResponse.of(ErrorCodes.USER_ALREADY_ACTIVE, ex.getMessage(),
-                        HttpStatus.CONFLICT, request.getRequestURI()));
-    }
 }

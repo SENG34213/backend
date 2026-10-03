@@ -108,8 +108,7 @@ public class GatewayAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/auth/password")  // covers /forgot and /reset (FR-04/FR-05)
                 || path.startsWith("/actuator")
                 || path.startsWith("/swagger-ui")
-                || path.startsWith("/v3/api-docs")
-                || path.startsWith("/api/auth/reactivate");
+                || path.startsWith("/v3/api-docs");
     }
 
     private void unauthorized(HttpServletResponse response, String message) throws IOException {
