@@ -9,6 +9,7 @@ import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.InvalidResetCodeException;
 import com.gamingcastle.userservice.repository.PasswordResetTokenRepository;
 import com.gamingcastle.userservice.repository.UserRepository;
+import com.gamingcastle.userservice.client.NotificationClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -34,7 +35,7 @@ class PasswordResetServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordResetTokenRepository tokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private NotificationService notificationService;
+    @Mock private NotificationClient notificationClient;
 
     private PasswordResetService passwordResetService;
 
@@ -42,7 +43,7 @@ class PasswordResetServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         passwordResetService = new PasswordResetServiceImpl(
-                userRepository, tokenRepository, passwordEncoder, notificationService);
+                userRepository, tokenRepository, passwordEncoder, notificationClient);
     }
 
     private User sampleUser() {
@@ -69,8 +70,8 @@ class PasswordResetServiceTest {
         passwordResetService.requestReset(request);
 
         // Assert
-        verify(notificationService).sendPasswordResetEmail(eq(user.getEmail()), any());
-        verify(notificationService, never()).sendPasswordResetSms(any(), any());
+        verify(notificationClient).sendPasswordResetEmail(eq(user.getEmail()), any());
+        verify(notificationClient, never()).sendPasswordResetSms(any(), any());
         verify(tokenRepository).save(any(PasswordResetToken.class));
     }
 
@@ -88,8 +89,8 @@ class PasswordResetServiceTest {
         passwordResetService.requestReset(request);
 
         // Assert
-        verify(notificationService).sendPasswordResetSms(eq(user.getPhoneNumber()), any());
-        verify(notificationService, never()).sendPasswordResetEmail(any(), any());
+        verify(notificationClient).sendPasswordResetSms(eq(user.getPhoneNumber()), any());
+        verify(notificationClient, never()).sendPasswordResetEmail(any(), any());
     }
 
     @Test
@@ -102,7 +103,7 @@ class PasswordResetServiceTest {
         passwordResetService.requestReset(request);
 
         // Assert — no code generated, no notification sent, no enumeration signal
-        verifyNoInteractions(notificationService);
+        verifyNoInteractions(notificationClient);
         verify(tokenRepository, never()).save(any());
     }
 
