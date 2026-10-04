@@ -11,4 +11,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The current Compose setup runs `user-service` at `http://localhost:8081`.
+The Compose setup runs the API gateway at `http://localhost:8080`, with
+`user-service` on port 8081, `booking-service` on 8082, `payment-service` on
+8083, `tournament-service` on 8084, `loyalty-service` on 8085, and
+`notification-service` on 8086. The Eureka registry is available on port 8761.

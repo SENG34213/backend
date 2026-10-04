@@ -5,7 +5,7 @@ spring:
   application:
     name: user-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/gamingcastle_users}
+    url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
   jpa:
@@ -28,10 +28,10 @@ eureka:
     prefer-ip-address: true
 
 jwt:
-  secret: ${JWT_SECRET:gaming-castle-dev-secret-change-me-in-production-min-256-bits}
+  secret: ${JWT_SECRET}
   expiration-ms: 900000   # 15 minutes, per ADR-07
 
 gateway:
-  internal-secret: ${GATEWAY_INTERNAL_SECRET:gaming-castle-dev-gateway-secret-change-me}
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}
 
 
