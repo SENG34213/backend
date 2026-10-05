@@ -47,6 +47,7 @@ public class NotificationClient {
             String bookingId,
             String gameStationName,
             String bookingDate,
-            String timeSlot
+            String timeSlot,
+            String amount
     ) {}
 }

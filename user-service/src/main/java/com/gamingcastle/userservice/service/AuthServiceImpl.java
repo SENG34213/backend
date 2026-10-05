@@ -55,7 +55,6 @@ public class AuthServiceImpl implements AuthService {
         log.info("Registration attempt for email: {}", email);
 
         if (userRepository.existsByEmail(email)) {log.warn("Registration failed - email already exists: {}", email);
-
             throw new EmailAlreadyExistsException();
         }
 
@@ -81,13 +80,17 @@ public class AuthServiceImpl implements AuthService {
 
         log.debug("JWT token generated successfully for newly registered user: {}",user.getEmail());
 
+        boolean notificationSent = true;
+
         try {
             notificationClient.sendWelcomeEmail(user.getEmail(), user.getFullName());
+            log.info("Welcome notification sent successfully to {}",user.getEmail());
         } catch (Exception e) {
-            log.error("Failed to send welcome email to {}: {}", user.getEmail(), e.getMessage());
+            notificationSent = false;
+            log.error("Failed to send welcome email to {}: {}", user.getEmail(), e.getMessage(),e);
         }
 
-        return AuthResponse.of(token,user.getId().toString(),user.getEmail(),user.getRole().name());
+        return AuthResponse.of(token,user.getId().toString(),user.getEmail(),user.getRole().name(),notificationSent);
     }
 
     @Override

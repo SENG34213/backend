@@ -6,5 +6,6 @@ public record BookingEmailRequest(
     String bookingId,
     String gameStationName,
     String bookingDate,
-    String timeSlot
+    String timeSlot,
+    String amount
 ) {}

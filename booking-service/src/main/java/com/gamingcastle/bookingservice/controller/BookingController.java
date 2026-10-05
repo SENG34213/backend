@@ -46,9 +46,16 @@ public class BookingController {
         BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
         
         if (email != null && !email.isBlank()) {
+            String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            
             notificationClient.sendBookingConfirmation(new NotificationClient.BookingEmailRequest(
                 email, fullName, response.id().toString(), response.stationCode(), 
-                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+                dateStr, timeSlot, "LKR. 1,000.00"));
         }
         
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -96,9 +103,16 @@ public class BookingController {
         BookingResponse response = bookingService.cancelBooking(bookingId, userId, isAdmin);
         
         if (email != null && !email.isBlank()) {
+            String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            
             notificationClient.sendBookingCancelled(new NotificationClient.BookingEmailRequest(
                 email, fullName, response.id().toString(), response.stationCode(), 
-                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+                dateStr, timeSlot, "LKR. 1,000.00"));
         }
         
         return ResponseEntity.ok(response);
@@ -118,9 +132,16 @@ public class BookingController {
         BookingResponse response = bookingService.rescheduleBooking(bookingId, userId, isAdmin, request);
         
         if (email != null && !email.isBlank()) {
+            String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(response.startTime());
+            
             notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
                 email, fullName, response.id().toString(), response.stationCode(), 
-                response.startTime().toString(), "From " + response.startTime() + " to " + response.endTime()));
+                dateStr, timeSlot, "LKR. 1,000.00"));
         }
         
         return ResponseEntity.ok(response);

@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 /**
  * FR-07–FR-13: slot booking, availability, cancellation.
@@ -94,6 +96,11 @@ public class BookingServiceImpl implements BookingService {
                     "This booking is already cancelled");
         }
 
+        if (Instant.now().plus(2, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
+            throw new BookingException(HttpStatus.BAD_REQUEST, "TOO_LATE",
+                    "cannot rechedule or cancel because 2 hours here");
+        }
+
         booking.setStatus(BookingStatus.CANCELLED);
         booking = bookingRepository.save(booking);
         return BookingResponse.from(booking);
@@ -114,6 +121,11 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new BookingException(HttpStatus.CONFLICT, "INVALID_STATUS",
                     "Only CONFIRMED bookings can be rescheduled");
+        }
+
+        if (Instant.now().plus(2, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
+            throw new BookingException(HttpStatus.BAD_REQUEST, "TOO_LATE",
+                    "cannot rechedule or cancel because 2 hours here");
         }
 
         if (!request.endTime().isAfter(request.startTime())) {
