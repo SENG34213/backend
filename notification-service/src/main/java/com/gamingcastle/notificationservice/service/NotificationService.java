@@ -216,7 +216,8 @@ public class NotificationService {
                         <div style="margin:25px 0; padding:20px; background-color:#f8f9fa; border-radius:8px; border-left:4px solid #6c63ff;">
                             <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Game Station:</strong> %s</p>
                             <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Date:</strong> %s</p>
-                            <p style="margin:0; color:#444444; font-size:15px;"><strong>Time Slot:</strong> %s</p>
+                            <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Time Slot:</strong> %s (24Hrs)</p>
+                            <p style="margin:0; color:#444444; font-size:15px;"><strong>Amount:</strong> %s</p>
                         </div>
 
                         <p style="color:#555555; font-size:16px; line-height:1.6;">
@@ -235,7 +236,7 @@ public class NotificationService {
 
             </body>
             </html>
-            """.formatted(request.customerName(), request.bookingId(), request.gameStationName(), request.bookingDate(), request.timeSlot());
+            """.formatted(request.customerName(), request.bookingId(), request.gameStationName(), request.bookingDate(), request.timeSlot(), request.amount());
         try {
             emailSenderService.sendHtmlEmail(request.email(), subject, htmlBody);
             logNotification("BOOKING_CONFIRMATION", request.email(), "SENT", null);

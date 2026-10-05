@@ -5,9 +5,14 @@ public record AuthResponse(
         String tokenType,
         String userId,
         String email,
-        String role
+        String role,
+        Boolean notificationSent
 ) {
-    public static AuthResponse of(String token, String userId, String email, String role) {
-        return new AuthResponse(token, "Bearer", userId, email, role);
+    public static AuthResponse of(String token, String userId, String email, String role, boolean notificationSent) {
+        return new AuthResponse(token, "Bearer", userId, email, role, notificationSent);
+    }
+
+    public static AuthResponse of(String token,String userId,String email,String role) {
+        return new AuthResponse(token, "Bearer", userId, email, role,null);
     }
 }
