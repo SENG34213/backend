@@ -1,5 +1,7 @@
 package com.gamingcastle.notificationservice.controller;
 
+import com.gamingcastle.notificationservice.dto.AccountReactivationEmailRequest;
+import com.gamingcastle.notificationservice.dto.AccountReactivationSmsRequest;
 import com.gamingcastle.notificationservice.dto.BookingEmailRequest;
 import com.gamingcastle.notificationservice.dto.PasswordResetEmailRequest;
 import com.gamingcastle.notificationservice.dto.PasswordResetSmsRequest;
@@ -33,6 +35,12 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/account-reactivation")
+    public ResponseEntity<Void> sendAccountReactivationEmail(@RequestBody AccountReactivationEmailRequest request) {
+        notificationService.sendAccountReactivationEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/booking-confirmed")
     public ResponseEntity<Void> sendBookingConfirmation(@RequestBody BookingEmailRequest request) {
         notificationService.sendBookingConfirmationEmail(request);
@@ -54,6 +62,12 @@ public class NotificationController {
     @PostMapping("/password-reset-sms")
     public ResponseEntity<Void> sendPasswordResetSms(@RequestBody PasswordResetSmsRequest request) {
         notificationService.sendPasswordResetSms(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/account-reactivation-sms")
+    public ResponseEntity<Void> sendAccountReactivationSms(@RequestBody AccountReactivationSmsRequest request) {
+        notificationService.sendAccountReactivationSms(request);
         return ResponseEntity.ok().build();
     }
 }

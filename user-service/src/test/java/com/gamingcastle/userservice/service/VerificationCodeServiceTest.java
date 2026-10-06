@@ -87,7 +87,7 @@ class VerificationCodeServiceTest {
     // --- issueCode ---
 
     @Test
-    void issueCode_shouldEmailCodeAndStoreItWithPurpose_givenEmailIdentifier() {
+    void issueCode_shouldEmailAccountReactivationCode_givenEmailIdentifierAndReactivationPurpose() {
         User user = sampleUser();
         when(passwordEncoder.encode(any())).thenReturn("hashed-code");
 
@@ -98,12 +98,24 @@ class VerificationCodeServiceTest {
         assertThat(captor.getValue().getPurpose()).isEqualTo(VerificationPurpose.ACCOUNT_REACTIVATION);
         assertThat(captor.getValue().getChannel()).isEqualTo(PasswordResetChannel.EMAIL);
         assertThat(captor.getValue().getCodeHash()).isEqualTo("hashed-code");
-        verify(notificationClient).sendPasswordResetEmail(eq(user.getEmail()), any());
+        verify(notificationClient).sendAccountReactivationEmail(eq(user.getEmail()), any());
+        verify(notificationClient, never()).sendPasswordResetEmail(any(), any());
         verify(notificationClient, never()).sendPasswordResetSms(any(), any());
     }
 
     @Test
-    void issueCode_shouldTextCode_givenPhoneIdentifier() {
+    void issueCode_shouldEmailPasswordResetCode_givenEmailIdentifierAndPasswordResetPurpose() {
+        User user = sampleUser();
+        when(passwordEncoder.encode(any())).thenReturn("hashed-code");
+
+        service.issueCode(user, "player@example.com", VerificationPurpose.PASSWORD_RESET);
+
+        verify(notificationClient).sendPasswordResetEmail(eq(user.getEmail()), any());
+        verify(notificationClient, never()).sendAccountReactivationEmail(any(), any());
+    }
+
+    @Test
+    void issueCode_shouldTextPasswordResetCode_givenPhoneIdentifierAndPasswordResetPurpose() {
         User user = sampleUser();
         when(passwordEncoder.encode(any())).thenReturn("hashed-code");
 
@@ -111,6 +123,17 @@ class VerificationCodeServiceTest {
 
         verify(notificationClient).sendPasswordResetSms(eq(user.getPhoneNumber()), any());
         verify(notificationClient, never()).sendPasswordResetEmail(any(), any());
+    }
+
+    @Test
+    void issueCode_shouldTextAccountReactivationCode_givenPhoneIdentifierAndReactivationPurpose() {
+        User user = sampleUser();
+        when(passwordEncoder.encode(any())).thenReturn("hashed-code");
+
+        service.issueCode(user, "0771234567", VerificationPurpose.ACCOUNT_REACTIVATION);
+
+        verify(notificationClient).sendAccountReactivationSms(eq(user.getPhoneNumber()), any());
+        verify(notificationClient, never()).sendPasswordResetSms(any(), any());
     }
 
     // --- verifyAndConsume ---
