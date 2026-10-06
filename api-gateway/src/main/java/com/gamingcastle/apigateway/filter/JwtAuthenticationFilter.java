@@ -40,6 +40,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/auth/register",
             "/api/auth/login",          // covers /api/auth/login and /api/auth/login/phone (FR-03)
             "/api/auth/password",       // covers /api/auth/password/forgot and /reset (FR-04/FR-05)
+            "/api/auth/reactivate",     // covers /reactivate/request and /confirm (self-deactivated users, no token yet)
             "/actuator"
     );
 

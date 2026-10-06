@@ -43,6 +43,11 @@ public class PasswordResetToken extends BaseEntity {
     private Instant expiresAt;
 
     @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private VerificationPurpose purpose = VerificationPurpose.PASSWORD_RESET;
+
+    @Builder.Default
     @Column(nullable = false)
     private boolean used = false;
 

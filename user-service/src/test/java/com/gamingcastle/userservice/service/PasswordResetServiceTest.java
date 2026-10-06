@@ -2,14 +2,12 @@ package com.gamingcastle.userservice.service;
 
 import com.gamingcastle.userservice.dto.request.ForgotPasswordRequest;
 import com.gamingcastle.userservice.dto.request.ResetPasswordRequest;
-import com.gamingcastle.userservice.entity.PasswordResetChannel;
-import com.gamingcastle.userservice.entity.PasswordResetToken;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
+import com.gamingcastle.userservice.entity.VerificationPurpose;
 import com.gamingcastle.userservice.exception.InvalidResetCodeException;
-import com.gamingcastle.userservice.repository.PasswordResetTokenRepository;
 import com.gamingcastle.userservice.repository.UserRepository;
-import com.gamingcastle.userservice.client.NotificationClient;
+import com.gamingcastle.userservice.service.impl.PasswordResetServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -23,19 +21,20 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * Follows the course's AAA / Given-When-Then unit test standard (§6.3.1).
  * Covers FR-04 (email verification) and FR-05 (phone verification).
+ * Code generation / email-vs-SMS routing / expiry / hash matching now live in
+ * VerificationCodeService and are tested in VerificationCodeServiceTest -
+ * here we only check that the reset flow uses it correctly.
  */
 class PasswordResetServiceTest {
 
     @Mock private UserRepository userRepository;
-    @Mock private PasswordResetTokenRepository tokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private NotificationClient notificationClient;
+    @Mock private VerificationCodeService verificationCodeService;
 
     private PasswordResetService passwordResetService;
 
@@ -43,7 +42,7 @@ class PasswordResetServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         passwordResetService = new PasswordResetServiceImpl(
-                userRepository, tokenRepository, passwordEncoder, notificationClient);
+                userRepository, passwordEncoder, verificationCodeService);
     }
 
     private User sampleUser() {
@@ -56,130 +55,72 @@ class PasswordResetServiceTest {
                 .build();
     }
 
-    // --- FR-04: request via email ---
+    // --- FR-04 / FR-05: request ---
 
     @Test
-    void requestReset_shouldEmailCode_givenEmailIdentifier() {
-        // Arrange
+    void requestReset_shouldIssueResetCode_givenEmailIdentifier() {
         User user = sampleUser();
-        ForgotPasswordRequest request = new ForgotPasswordRequest("player@example.com");
-        when(userRepository.findByEmail("player@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode(any())).thenReturn("hashed-code");
+        when(verificationCodeService.findUserByIdentifier("player@example.com")).thenReturn(Optional.of(user));
 
-        // Act
-        passwordResetService.requestReset(request);
-
-        // Assert
-        verify(notificationClient).sendPasswordResetEmail(eq(user.getEmail()), any());
-        verify(notificationClient, never()).sendPasswordResetSms(any(), any());
-        verify(tokenRepository).save(any(PasswordResetToken.class));
+        passwordResetService.requestReset(new ForgotPasswordRequest("player@example.com"));
+        verify(verificationCodeService).issueCode(user, "player@example.com", VerificationPurpose.PASSWORD_RESET);
     }
 
-    // --- FR-05: request via phone ---
-
     @Test
-    void requestReset_shouldTextCode_givenPhoneIdentifier() {
-        // Arrange
+    void requestReset_shouldIssueResetCode_givenPhoneIdentifier() {
         User user = sampleUser();
-        ForgotPasswordRequest request = new ForgotPasswordRequest("0771234567");
-        when(userRepository.findByPhoneNumber("0771234567")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode(any())).thenReturn("hashed-code");
+        when(verificationCodeService.findUserByIdentifier("0771234567")).thenReturn(Optional.of(user));
 
-        // Act
-        passwordResetService.requestReset(request);
-
-        // Assert
-        verify(notificationClient).sendPasswordResetSms(eq(user.getPhoneNumber()), any());
-        verify(notificationClient, never()).sendPasswordResetEmail(any(), any());
+        passwordResetService.requestReset(new ForgotPasswordRequest("0771234567"));
+        verify(verificationCodeService).issueCode(user, "0771234567", VerificationPurpose.PASSWORD_RESET);
     }
 
     @Test
     void requestReset_shouldDoNothing_givenUnknownIdentifier() {
-        // Arrange
-        ForgotPasswordRequest request = new ForgotPasswordRequest("nobody@example.com");
-        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+        when(verificationCodeService.findUserByIdentifier("nobody@example.com")).thenReturn(Optional.empty());
 
-        // Act
-        passwordResetService.requestReset(request);
-
-        // Assert — no code generated, no notification sent, no enumeration signal
-        verifyNoInteractions(notificationClient);
-        verify(tokenRepository, never()).save(any());
+        passwordResetService.requestReset(new ForgotPasswordRequest("nobody@example.com"));
+        verify(verificationCodeService, never()).issueCode(any(), any(), any());
     }
 
     // --- reset confirmation, shared by FR-04/FR-05 ---
 
     @Test
     void resetPassword_shouldUpdatePassword_givenValidCode() {
-        // Arrange
         User user = sampleUser();
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .codeHash("hashed-code")
-                .channel(PasswordResetChannel.EMAIL)
-                .expiresAt(Instant.now().plusSeconds(600))
-                .used(false)
-                .build();
-        ResetPasswordRequest request = new ResetPasswordRequest("player@example.com", "123456", "newpassword1");
-
-        when(userRepository.findByEmail("player@example.com")).thenReturn(Optional.of(user));
-        when(tokenRepository.findFirstByUserIdAndUsedFalseOrderByCreatedAtDesc(user.getId()))
-                .thenReturn(Optional.of(token));
-        when(passwordEncoder.matches("123456", "hashed-code")).thenReturn(true);
+        user.setFailedLoginAttempts(3);
+        user.setLockedUntil(Instant.now().plusSeconds(300));
+        when(verificationCodeService.findUserByIdentifier("player@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("newpassword1")).thenReturn("new-hash");
 
-        // Act
-        passwordResetService.resetPassword(request);
+        passwordResetService.resetPassword(new ResetPasswordRequest("player@example.com", "123456", "newpassword1"));
 
-        // Assert
+        verify(verificationCodeService).verifyAndConsume(user, "123456", VerificationPurpose.PASSWORD_RESET);
         assertThat(user.getPasswordHash()).isEqualTo("new-hash");
-        assertThat(token.isUsed()).isTrue();
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        assertThat(user.getLockedUntil()).isNull();
         verify(userRepository).save(user);
     }
 
     @Test
-    void resetPassword_shouldReject_givenExpiredCode() {
-        // Arrange
+    void resetPassword_shouldReject_givenInvalidCode() {
         User user = sampleUser();
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .codeHash("hashed-code")
-                .channel(PasswordResetChannel.PHONE)
-                .expiresAt(Instant.now().minusSeconds(60)) // already expired
-                .used(false)
-                .build();
-        ResetPasswordRequest request = new ResetPasswordRequest("0771234567", "123456", "newpassword1");
+        when(verificationCodeService.findUserByIdentifier("player@example.com")).thenReturn(Optional.of(user));
+        doThrow(new InvalidResetCodeException())
+                .when(verificationCodeService).verifyAndConsume(user, "000000", VerificationPurpose.PASSWORD_RESET);
 
-        when(userRepository.findByPhoneNumber("0771234567")).thenReturn(Optional.of(user));
-        when(tokenRepository.findFirstByUserIdAndUsedFalseOrderByCreatedAtDesc(user.getId()))
-                .thenReturn(Optional.of(token));
-
-        // Act & Assert
-        assertThatThrownBy(() -> passwordResetService.resetPassword(request))
+        assertThatThrownBy(() -> passwordResetService.resetPassword(
+                new ResetPasswordRequest("player@example.com", "000000", "newpassword1")))
                 .isInstanceOf(InvalidResetCodeException.class);
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    void resetPassword_shouldReject_givenWrongCode() {
-        // Arrange
-        User user = sampleUser();
-        PasswordResetToken token = PasswordResetToken.builder()
-                .user(user)
-                .codeHash("hashed-code")
-                .channel(PasswordResetChannel.EMAIL)
-                .expiresAt(Instant.now().plusSeconds(600))
-                .used(false)
-                .build();
-        ResetPasswordRequest request = new ResetPasswordRequest("player@example.com", "000000", "newpassword1");
+    void resetPassword_shouldReject_givenUnknownIdentifier() {
+        when(verificationCodeService.findUserByIdentifier("nobody@example.com")).thenReturn(Optional.empty());
 
-        when(userRepository.findByEmail("player@example.com")).thenReturn(Optional.of(user));
-        when(tokenRepository.findFirstByUserIdAndUsedFalseOrderByCreatedAtDesc(user.getId()))
-                .thenReturn(Optional.of(token));
-        when(passwordEncoder.matches("000000", "hashed-code")).thenReturn(false);
-
-        // Act & Assert
-        assertThatThrownBy(() -> passwordResetService.resetPassword(request))
+        assertThatThrownBy(() -> passwordResetService.resetPassword(
+                new ResetPasswordRequest("nobody@example.com", "123456", "newpassword1")))
                 .isInstanceOf(InvalidResetCodeException.class);
         verify(userRepository, never()).save(any());
     }
