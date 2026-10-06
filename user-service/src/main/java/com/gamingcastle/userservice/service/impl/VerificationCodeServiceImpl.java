@@ -71,10 +71,18 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
 
         log.info("Verification code ({}) issued for user: {} via {}", purpose, user.getId(), channel);
 
-        if (channel == PasswordResetChannel.EMAIL) {
-            notificationClient.sendPasswordResetEmail(user.getEmail(), code);
+        if (purpose == VerificationPurpose.ACCOUNT_REACTIVATION) {
+            if (channel == PasswordResetChannel.EMAIL) {
+                notificationClient.sendAccountReactivationEmail(user.getEmail(), code);
+            } else {
+                notificationClient.sendAccountReactivationSms(user.getPhoneNumber(), code);
+            }
         } else {
-            notificationClient.sendPasswordResetSms(user.getPhoneNumber(), code);
+            if (channel == PasswordResetChannel.EMAIL) {
+                notificationClient.sendPasswordResetEmail(user.getEmail(), code);
+            } else {
+                notificationClient.sendPasswordResetSms(user.getPhoneNumber(), code);
+            }
         }
     }
 

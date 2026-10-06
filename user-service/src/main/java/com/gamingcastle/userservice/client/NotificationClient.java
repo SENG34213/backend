@@ -40,7 +40,25 @@ public class NotificationClient {
         }
     }
 
+    public void sendAccountReactivationEmail(String email, String code) {
+        try {
+            restTemplate.postForEntity(BASE_URL + "/account-reactivation", new AccountReactivationEmailRequest(email, code), Void.class);
+        } catch (Exception e) {
+            log.error("Failed to send account reactivation email via notification-service", e);
+        }
+    }
+
+    public void sendAccountReactivationSms(String phoneNumber, String code) {
+        try {
+            restTemplate.postForEntity(BASE_URL + "/account-reactivation-sms", new AccountReactivationSmsRequest(phoneNumber, code), Void.class);
+        } catch (Exception e) {
+            log.error("Failed to send account reactivation sms via notification-service", e);
+        }
+    }
+
     public record WelcomeEmailRequest(String email, String fullName) {}
     public record PasswordResetEmailRequest(String email, String code) {}
     public record PasswordResetSmsRequest(String phoneNumber, String code) {}
+    public record AccountReactivationEmailRequest(String email, String code) {}
+    public record AccountReactivationSmsRequest(String phoneNumber, String code) {}
 }

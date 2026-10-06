@@ -1,5 +1,7 @@
 package com.gamingcastle.notificationservice.service;
 
+import com.gamingcastle.notificationservice.dto.AccountReactivationEmailRequest;
+import com.gamingcastle.notificationservice.dto.AccountReactivationSmsRequest;
 import com.gamingcastle.notificationservice.dto.BookingEmailRequest;
 import com.gamingcastle.notificationservice.dto.PasswordResetEmailRequest;
 import com.gamingcastle.notificationservice.dto.WelcomeEmailRequest;
@@ -384,6 +386,104 @@ public class NotificationService {
             throw e;
         }
     }
+
+    public void sendAccountReactivationEmail(AccountReactivationEmailRequest request) {
+        String subject = "Your Gaming Castle account reactivation code";
+        String htmlBody = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Account Reactivation</title>
+            </head>
+            <body style="margin:0; padding:0; background-color:#f4f4f7; font-family:Arial, Helvetica, sans-serif;">
+
+                <div style="max-width:600px; margin:40px auto; padding:20px;">
+
+                    <div style="background-color:#1a1a2e; padding:30px; text-align:center;
+                                border-radius:12px 12px 0 0;">
+                        <h1 style="margin:0; color:#ffffff; font-size:28px;">
+                            🎮 Gaming Castle
+                        </h1>
+                        <p style="margin:8px 0 0; color:#c7c7d9; font-size:14px;">
+                            Account Reactivation
+                        </p>
+                    </div>
+
+                    <div style="background-color:#ffffff; padding:40px 30px;
+                                border-radius:0 0 12px 12px;">
+
+                        <h2 style="margin-top:0; color:#222222;">
+                            Reactivate Your Account
+                        </h2>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            We received a request to reactivate your Gaming Castle account.
+                        </p>
+
+                        <p style="color:#555555; font-size:16px; line-height:1.6;">
+                            Use the verification code below to restore access to your account:
+                        </p>
+
+                        <div style="margin:30px 0; text-align:center;">
+                            <div style="display:inline-block;
+                                        padding:18px 35px;
+                                        background-color:#f1f0ff;
+                                        border:2px dashed #6c63ff;
+                                        border-radius:10px;
+                                        color:#6c63ff;
+                                        font-size:32px;
+                                        font-weight:bold;
+                                        letter-spacing:8px;">
+                                %s
+                            </div>
+                        </div>
+
+                        <p style="color:#555555; font-size:14px; line-height:1.6;">
+                            ⏱ This verification code will expire in
+                            <strong>15 minutes</strong>.
+                        </p>
+
+                        <p style="color:#777777; font-size:14px; line-height:1.6;">
+                            If you didn't request account reactivation, you can safely ignore
+                            this email.
+                        </p>
+
+                        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+
+                        <p style="margin:0; color:#999999; font-size:12px; text-align:center;">
+                            © Gaming Castle. All rights reserved.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </body>
+            </html>
+            """.formatted(request.code());
+        try {
+            emailSenderService.sendHtmlEmail(request.email(), subject, htmlBody);
+            logNotification("ACCOUNT_REACTIVATION_EMAIL", request.email(), "SENT", null);
+        } catch (Exception e) {
+            logNotification("ACCOUNT_REACTIVATION_EMAIL", request.email(), "FAILED", e.getMessage());
+            throw e;
+        }
+    }
+
+    public void sendAccountReactivationSms(AccountReactivationSmsRequest request) {
+        String message = "Your Gaming Castle account reactivation code is " + request.code() + ". It expires in 15 minutes.";
+        try {
+            smsService.send(request.phoneNumber(), message);
+            logNotification("ACCOUNT_REACTIVATION_SMS", request.phoneNumber(), "SENT", null);
+        } catch (Exception e) {
+            logNotification("ACCOUNT_REACTIVATION_SMS", request.phoneNumber(), "FAILED", e.getMessage());
+            throw e;
+        }
+    }
+
+
 
     private void logNotification(String type, String recipient, String status, String error) {
         Notification notification = Notification.builder()
