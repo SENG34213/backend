@@ -25,3 +25,10 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 9000000   # 15 minutes, per ADR-07
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}

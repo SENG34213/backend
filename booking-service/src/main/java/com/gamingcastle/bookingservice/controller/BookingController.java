@@ -6,9 +6,14 @@ import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.dto.ConfirmBookingRequest;
 import com.gamingcastle.bookingservice.dto.WalkInBookingRequest;
 import com.gamingcastle.bookingservice.entity.BookingSource;
+import com.gamingcastle.bookingservice.entity.BookingStatus;
 import com.gamingcastle.bookingservice.service.BookingService;
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -158,5 +163,35 @@ public class BookingController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Admin: paginated list of ALL bookings across all users.
+     *
+     * GET /api/bookings/admin/all?page=0&size=20&sort=createdAt,desc&status=CONFIRMED
+     *
+     * @param status optional filter (PENDING, CONFIRMED, CANCELLED)
+     * @param page   zero-based page number (default 0)
+     * @param size   page size (default 20, max 100)
+     * @param sort   sort field + direction, e.g. "createdAt,desc"
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/all")
+    public ResponseEntity<Page<BookingResponse>> getAllBookings(
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
+        // cap page size at 100 to prevent runaway queries
+        size = Math.min(size, 100);
+
+        String[] sortParts = sort.split(",");
+        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
+
+        Page<BookingResponse> result = bookingService.getAllBookings(status, pageable);
+        return ResponseEntity.ok(result);
     }
 }

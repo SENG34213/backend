@@ -14,6 +14,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI userServiceOpenAPI() {
 
+        // Used when accessing via API Gateway (port 8080) — standard JWT flow
         SecurityScheme bearerScheme = new SecurityScheme()
                 .name("Authorization")
                 .type(SecurityScheme.Type.HTTP)
@@ -25,18 +26,49 @@ public class OpenApiConfig {
                 .type(SecurityScheme.Type.APIKEY)
                 .in(SecurityScheme.In.HEADER);
 
+        // ── Direct service access (port 8081) ────────────────────────────────
+        // The API Gateway normally injects these headers after validating the JWT.
+        // When testing directly (Swagger UI at :8081 or Postman), you must provide
+        // them manually so GatewayAuthenticationFilter can authenticate the request.
+        //
+        //   X-User-Id   → any valid UUID, e.g. 00000000-0000-0000-0000-000000000001
+        //   X-User-Role → ADMIN  (or CUSTOMER for non-admin endpoints)
+        SecurityScheme userIdScheme = new SecurityScheme()
+                .name("X-User-Id")
+                .type(SecurityScheme.Type.APIKEY)
+                .in(SecurityScheme.In.HEADER)
+                .description("Direct-access only. Any UUID, e.g. 00000000-0000-0000-0000-000000000001");
+
+        SecurityScheme userRoleScheme = new SecurityScheme()
+                .name("X-User-Role")
+                .type(SecurityScheme.Type.APIKEY)
+                .in(SecurityScheme.In.HEADER)
+                .description("Direct-access only. Use ADMIN or CUSTOMER");
+
         return new OpenAPI()
                 .info(new Info()
                         .title("Gaming Castle User Service API")
-                        .description("REST API for Gaming Castle User Service")
+                        .description("""
+                                REST API for Gaming Castle User Service.
+
+                                **Via API Gateway (port 8080):** Authenticate with your JWT token from /api/auth/login.
+
+                                **Direct access (port 8081 / Swagger UI):** Click Authorize and fill in:
+                                - `X-User-Id`: any UUID (e.g. `00000000-0000-0000-0000-000000000001`)
+                                - `X-User-Role`: `ADMIN`
+                                """)
                         .version("1.0.0"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth", bearerScheme)
-                        .addSecuritySchemes("gatewaySecretHeader", gatewaySecretScheme))
+                        .addSecuritySchemes("gatewaySecretHeader", gatewaySecretScheme)
+                        .addSecuritySchemes("X-User-Id", userIdScheme)
+                        .addSecuritySchemes("X-User-Role", userRoleScheme))
                 .addSecurityItem(
                         new SecurityRequirement()
                                 .addList("bearerAuth")
                                 .addList("gatewaySecretHeader")
+                                .addList("X-User-Id")
+                                .addList("X-User-Role")
                 );
     }
 }

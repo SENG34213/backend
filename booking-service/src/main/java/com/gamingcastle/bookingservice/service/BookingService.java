@@ -3,6 +3,9 @@ package com.gamingcastle.bookingservice.service;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.entity.BookingSource;
+import com.gamingcastle.bookingservice.entity.BookingStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,4 +45,12 @@ public interface BookingService {
      * @param paymentId the payment associated with the successful payment
      */
     BookingResponse confirmBooking(UUID bookingId, UUID paymentId);
-}
+
+    /**
+     * Admin: paginated view of all bookings, with optional status filter.
+     *
+     * @param status   optional filter — pass null to return all statuses
+     * @param pageable page + sort info (e.g. page=0&size=20&sort=createdAt,desc)
+     */
+    Page<BookingResponse> getAllBookings(BookingStatus status, Pageable pageable);
+}
