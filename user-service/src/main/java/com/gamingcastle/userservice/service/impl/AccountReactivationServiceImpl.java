@@ -50,7 +50,7 @@ public class AccountReactivationServiceImpl implements AccountReactivationServic
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidResetCodeException.class)
     public AuthResponse confirmReactivation(ConfirmReactivationRequest request) {
         String identifier = request.identifier().trim();
 

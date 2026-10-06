@@ -5,7 +5,7 @@ spring:
   application:
     name: user-service
   datasource:
-    url: ${USER_DB_URL}
+    url: ${USER_DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_user}
     username: ${USER_DB_USER}
     password: ${USER_DB_PASSWORD}
   jpa:

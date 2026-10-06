@@ -3,12 +3,15 @@ package com.gamingcastle.userservice.exception;
 import com.gamingcastle.userservice.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -62,6 +65,7 @@ public class GlobalExceptionHandler {
                                                              HttpServletRequest request) {
         log.warn("Account locked at {}: {}", request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.LOCKED)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(ErrorResponse.of(ErrorCodes.ACCOUNT_LOCKED, ex.getMessage(),
                         HttpStatus.LOCKED, request.getRequestURI()));
     }

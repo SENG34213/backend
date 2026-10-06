@@ -9,6 +9,7 @@ import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
 import com.gamingcastle.userservice.exception.AccountDeactivatedByAdminException;
 import com.gamingcastle.userservice.exception.AccountDeactivatedException;
+import com.gamingcastle.userservice.exception.AccountLockedException;
 import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.service.impl.AuthServiceImpl;
@@ -96,7 +97,7 @@ class AuthServiceTest {
                 .build();
         LoginRequest request = new LoginRequest("player@example.com", "password123");
 
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
         when(jwtUtil.generateToken(user)).thenReturn("mock-jwt-token");
 
@@ -120,7 +121,7 @@ class AuthServiceTest {
                 .build();
         LoginRequest request = new LoginRequest("player@example.com", "wrong-password");
 
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
 
         // Act & Assert
@@ -141,7 +142,7 @@ class AuthServiceTest {
                 .build();
         LoginRequest request = new LoginRequest("player@example.com", "password123");
 
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
 
         // Act & Assert
         assertThatThrownBy(() -> authService.login(request))
@@ -165,7 +166,7 @@ class AuthServiceTest {
                 .build();
         PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
 
-        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
         when(jwtUtil.generateToken(user)).thenReturn("mock-jwt-token");
 
@@ -181,7 +182,7 @@ class AuthServiceTest {
     void loginByPhone_shouldRejectInvalidCredentials_givenUnknownPhoneNumber() {
         // Arrange
         PhoneLoginRequest request = new PhoneLoginRequest("0000000000", "password123");
-        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.empty());
+        when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> authService.loginByPhone(request))
@@ -207,7 +208,7 @@ class AuthServiceTest {
     void login_shouldRequireVerification_givenSelfDeactivatedAccount() {
         User user = deactivatedUser(DeactivatedBy.SELF);
         LoginRequest request = new LoginRequest("player@example.com", "password123");
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(request))
@@ -219,7 +220,7 @@ class AuthServiceTest {
     void login_shouldShowAdminMessage_givenAdminDeactivatedAccount() {
         User user = deactivatedUser(DeactivatedBy.ADMIN);
         LoginRequest request = new LoginRequest("player@example.com", "password123");
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(request))
@@ -232,7 +233,7 @@ class AuthServiceTest {
     void login_shouldNotRevealDeactivation_givenWrongPassword() {
         User user = deactivatedUser(DeactivatedBy.SELF);
         LoginRequest request = new LoginRequest("player@example.com", "wrong-password");
-        when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(request))
@@ -243,7 +244,7 @@ class AuthServiceTest {
     void loginByPhone_shouldRequireVerification_givenSelfDeactivatedAccount() {
         User user = deactivatedUser(DeactivatedBy.SELF);
         PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
-        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.loginByPhone(request))
@@ -254,10 +255,52 @@ class AuthServiceTest {
     void loginByPhone_shouldShowAdminMessage_givenAdminDeactivatedAccount() {
         User user = deactivatedUser(DeactivatedBy.ADMIN);
         PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "password123");
-        when(userRepository.findByPhoneNumber(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.loginByPhone(request))
                 .isInstanceOf(AccountDeactivatedByAdminException.class);
+    }
+
+    @Test
+    void login_shouldStartCountingFromOne_whenPreviousLockHasExpired() {
+        User user = User.builder().id(UUID.randomUUID()).email("player@example.com")
+                .passwordHash("hashed-password").role(Role.CUSTOMER)
+                .failedLoginAttempts(5).lockedUntil(Instant.now().minusSeconds(60)).build();
+        LoginRequest request = new LoginRequest("player@example.com", "wrong-password");
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(request)).isInstanceOf(InvalidCredentialsException.class);
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(1);
+        assertThat(user.isLocked()).isFalse();
+    }
+
+    @Test
+    void login_shouldExposeLockEndTime_whenAccountIsLocked() {
+        Instant lockedUntil = Instant.now().plusSeconds(600);
+        User user = User.builder().id(UUID.randomUUID()).email("player@example.com")
+                .passwordHash("hashed-password").role(Role.CUSTOMER)
+                .failedLoginAttempts(5).lockedUntil(lockedUntil).build();
+        LoginRequest request = new LoginRequest("player@example.com", "password123");
+        when(userRepository.findByEmailForUpdate(request.email())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOfSatisfying(AccountLockedException.class,
+                        e -> assertThat(e.getLockedUntil()).isEqualTo(lockedUntil));
+    }
+
+    @Test
+    void loginByPhone_shouldLockAccount_afterFiveFailedAttempts() {
+        User user = User.builder().id(UUID.randomUUID()).email("player@example.com")
+                .phoneNumber("0771234567").passwordHash("hashed-password").role(Role.CUSTOMER)
+                .failedLoginAttempts(4).build();
+        PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "wrong-password");
+        when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.loginByPhone(request)).isInstanceOf(InvalidCredentialsException.class);
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
+        assertThat(user.isLocked()).isTrue();
     }
 }
