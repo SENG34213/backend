@@ -1,6 +1,7 @@
 package com.gamingcastle.bookingservice.exception;
 
 import com.gamingcastle.bookingservice.dto.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -72,5 +74,29 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(
                         "INTERNAL_ERROR",
                         "An unexpected error occurred"));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestHeader(
+            MissingRequestHeaderException ex,
+            HttpServletRequest request) {
+
+        if ("X-User-Id".equals(ex.getHeaderName())
+                || "X-User-Role".equals(ex.getHeaderName())) {
+
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse(
+                            "UNAUTHORIZED",
+                            "Missing required identity header: " + ex.getHeaderName()
+                    ));
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(
+                        "BAD_REQUEST",
+                        "Missing required header: " + ex.getHeaderName()
+                ));
     }
 }

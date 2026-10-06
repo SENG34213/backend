@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /**
  * FR-07–FR-13: slot booking, availability, cancellation.
@@ -185,5 +187,17 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
 
         return BookingResponse.from(booking);
+    }
+
+    // ── Admin ─────────────────────────────────────────────────────────────────
+
+    @Override
+    public Page<BookingResponse> getAllBookings(BookingStatus status, Pageable pageable) {
+        if (status != null) {
+            return bookingRepository.findByStatus(status, pageable)
+                    .map(BookingResponse::from);
+        }
+        return bookingRepository.findAll(pageable)
+                .map(BookingResponse::from);
     }
 }
