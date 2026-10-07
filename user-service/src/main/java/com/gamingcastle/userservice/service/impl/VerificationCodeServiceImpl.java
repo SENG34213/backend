@@ -25,6 +25,8 @@ import java.util.Optional;
 public class VerificationCodeServiceImpl implements VerificationCodeService {
 
     private static final int CODE_EXPIRY_MINUTES = 15;
+    private static final int MAX_CODE_ATTEMPTS = 5;
+    private static final int MAX_CODES_PER_WINDOW = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
@@ -54,6 +56,14 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
     @Override
     @Transactional
     public void issueCode(User user, String identifier, VerificationPurpose purpose) {
+
+        long recentCodes = tokenRepository.countByUserIdAndPurposeAndCreatedAtAfter(
+                user.getId(), purpose, Instant.now().minus(CODE_EXPIRY_MINUTES, ChronoUnit.MINUTES));
+        if (recentCodes >= MAX_CODES_PER_WINDOW) {
+            log.warn("Verification code ({}) NOT issued - resend limit reached for user: {}", purpose, user.getId());
+            return;
+        }
+
         PasswordResetChannel channel = isEmail(identifier.trim())
                 ? PasswordResetChannel.EMAIL
                 : PasswordResetChannel.PHONE;
@@ -87,7 +97,7 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidResetCodeException.class)
     public void verifyAndConsume(User user, String code, VerificationPurpose purpose) {
         PasswordResetToken token = tokenRepository
                 .findFirstByUserIdAndPurposeAndUsedFalseOrderByCreatedAtDesc(user.getId(), purpose)
@@ -99,7 +109,11 @@ public class VerificationCodeServiceImpl implements VerificationCodeService {
         }
 
         if (!passwordEncoder.matches(code, token.getCodeHash())) {
-            log.warn("Verification ({}) rejected - code mismatch for user: {}", purpose, user.getId());
+            token.recordFailedAttempt(MAX_CODE_ATTEMPTS);
+            tokenRepository.save(token);
+            log.warn("Verification ({}) rejected - code mismatch for user: {} (attempt {}/{}{})",
+                    purpose, user.getId(), token.getFailedAttempts(), MAX_CODE_ATTEMPTS,
+                    token.isUsed() ? ", code invalidated" : "");
             throw new InvalidResetCodeException();
         }
 

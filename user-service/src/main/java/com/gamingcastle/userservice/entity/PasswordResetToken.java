@@ -51,6 +51,17 @@ public class PasswordResetToken extends BaseEntity {
     @Column(nullable = false)
     private boolean used = false;
 
+    @Builder.Default
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts = 0;
+
+    public void recordFailedAttempt(int maxAttempts) {
+        this.failedAttempts++;
+        if (this.failedAttempts >= maxAttempts) {
+            this.used = true;
+        }
+    }
+
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

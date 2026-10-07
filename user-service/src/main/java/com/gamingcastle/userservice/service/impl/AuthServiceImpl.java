@@ -96,13 +96,13 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
     public AuthResponse login(LoginRequest request) {
 
         String email = request.email().toLowerCase().trim();
         log.info("Login attempt for email: {}", email);
 
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailForUpdate(email)
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found for email: {}", email);
                     return new InvalidCredentialsException();
@@ -112,13 +112,13 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
     public AuthResponse loginByPhone(PhoneLoginRequest request) {
 
         String phoneNumber = request.phoneNumber().trim();
         log.info("Login attempt for phone number: {}", phoneNumber);
 
-        User user = userRepository.findByPhoneNumber(phoneNumber)
+        User user = userRepository.findByPhoneNumberForUpdate(phoneNumber)
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found for phone number: {}", phoneNumber);
                     return new InvalidCredentialsException();
@@ -133,21 +133,25 @@ public class AuthServiceImpl implements AuthService {
      */
     private AuthResponse authenticate(User user, String rawPassword) {
 
+        if (user.getLockedUntil() != null && !user.isLocked()) {
+            user.setLockedUntil(null);
+            user.setFailedLoginAttempts(0);
+            userRepository.save(user);
+        }
+
         if (user.isLocked()) {
             log.warn("Login rejected - account is locked for user: {}", user.getEmail());
-            throw new AccountLockedException();
+            throw new AccountLockedException(user.getLockedUntil());   // remaining time anuppum
         }
 
         if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-
-            log.warn("Login failed - invalid password for user: {}", user.getEmail());
             registerFailedAttempt(user);
-            log.info("Failed login attempts for {}: {}", user.getEmail(), user.getFailedLoginAttempts());
 
+            // 5th thappa attempt la udane "locked, 15 minutes" nu solla
             if (user.isLocked()) {
                 log.warn("Account locked due to repeated failed login attempts: {}", user.getEmail());
+                throw new AccountLockedException(user.getLockedUntil());
             }
-
             throw new InvalidCredentialsException();
         }
 

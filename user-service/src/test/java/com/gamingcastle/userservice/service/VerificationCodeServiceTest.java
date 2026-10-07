@@ -188,4 +188,33 @@ class VerificationCodeServiceTest {
                 .isInstanceOf(InvalidResetCodeException.class);
         verify(passwordEncoder, never()).matches(any(), any());
     }
+
+    @Test
+    void verifyAndConsume_shouldBurnCode_afterFiveWrongGuesses() {
+        User user = sampleUser();
+        PasswordResetToken token = token(user, VerificationPurpose.PASSWORD_RESET, Instant.now().plusSeconds(600));
+        when(tokenRepository.findFirstByUserIdAndPurposeAndUsedFalseOrderByCreatedAtDesc(
+                user.getId(), VerificationPurpose.PASSWORD_RESET)).thenReturn(Optional.of(token));
+        when(passwordEncoder.matches(any(), any())).thenReturn(false);
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.verifyAndConsume(user, "000000", VerificationPurpose.PASSWORD_RESET))
+                    .isInstanceOf(InvalidResetCodeException.class);
+        }
+
+        assertThat(token.getFailedAttempts()).isEqualTo(5);
+        assertThat(token.isUsed()).isTrue();
+    }
+
+    @Test
+    void issueCode_shouldNotSendNewCode_whenResendLimitReached() {
+        User user = sampleUser();
+        when(tokenRepository.countByUserIdAndPurposeAndCreatedAtAfter(
+                eq(user.getId()), eq(VerificationPurpose.PASSWORD_RESET), any())).thenReturn(3L);
+
+        service.issueCode(user, "player@example.com", VerificationPurpose.PASSWORD_RESET);
+
+        verify(tokenRepository, never()).save(any());
+        verifyNoInteractions(notificationClient);
+    }
 }

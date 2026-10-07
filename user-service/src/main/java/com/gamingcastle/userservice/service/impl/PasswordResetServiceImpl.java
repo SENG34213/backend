@@ -49,7 +49,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidResetCodeException.class)
     public void resetPassword(ResetPasswordRequest request) {
         String identifier = request.identifier().trim();
 
