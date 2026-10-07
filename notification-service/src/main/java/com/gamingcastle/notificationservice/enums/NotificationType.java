@@ -1,0 +1,12 @@
+package com.gamingcastle.notificationservice.enums;
+
+public enum NotificationType {
+    WELCOME_EMAIL,
+    PASSWORD_RESET_EMAIL,
+    BOOKING_CONFIRMATION,
+    BOOKING_RESCHEDULED,
+    BOOKING_CANCELLED,
+    PASSWORD_RESET_SMS,
+    ACCOUNT_REACTIVATION_EMAIL,
+    ACCOUNT_REACTIVATION_SMS
+}
