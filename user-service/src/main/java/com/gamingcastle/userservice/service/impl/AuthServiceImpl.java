@@ -96,7 +96,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(noRollbackFor = InvalidCredentialsException.class)
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
     public AuthResponse login(LoginRequest request) {
 
         String email = request.email().toLowerCase().trim();
@@ -112,7 +112,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(noRollbackFor = InvalidCredentialsException.class)
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
     public AuthResponse loginByPhone(PhoneLoginRequest request) {
 
         String phoneNumber = request.phoneNumber().trim();

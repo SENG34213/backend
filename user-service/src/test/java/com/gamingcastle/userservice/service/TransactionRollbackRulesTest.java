@@ -4,6 +4,7 @@ import com.gamingcastle.userservice.client.NotificationClient;
 import com.gamingcastle.userservice.dto.request.LoginRequest;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
+import com.gamingcastle.userservice.exception.AccountLockedException;
 import com.gamingcastle.userservice.exception.InvalidCredentialsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.service.impl.AuthServiceImpl;
@@ -64,5 +65,29 @@ class TransactionRollbackRulesTest {
         assertThat(user.getFailedLoginAttempts()).isEqualTo(1);
         verify(txManager).commit(txStatus);          // rollback aagakoodaadhu
         verify(txManager, never()).rollback(any());
+    }
+
+    private void assertCommittedNotRolledBack() {
+        verify(txManager).commit(txStatus);
+        verify(txManager, never()).rollback(any());
+    }
+
+    @Test
+    void login_shouldCommitLock_whenFifthWrongPasswordTriggersLockout() {
+        UserRepository userRepository = mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        User user = User.builder().id(UUID.randomUUID()).email("player@example.com")
+                .passwordHash("hash").role(Role.CUSTOMER).failedLoginAttempts(4).build();
+        when(userRepository.findByEmailForUpdate("player@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(any(), any())).thenReturn(false);
+        AuthService authService = withTransactions(
+                new AuthServiceImpl(userRepository, passwordEncoder, mock(JwtUtil.class), mock(NotificationClient.class)),
+                AuthService.class);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("player@example.com", "wrong")))
+                .isInstanceOfAny(InvalidCredentialsException.class, AccountLockedException.class);
+
+        assertThat(user.isLocked()).isTrue();
+        assertCommittedNotRolledBack();   // rollback aanaa lock DB-ku pogaadhu
     }
 }

@@ -125,7 +125,8 @@ class AuthServiceTest {
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
 
         // Act & Assert
-        assertThatThrownBy(() -> authService.login(request)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AccountLockedException.class); // CHANGED: was RuntimeException (too loose)
         assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
         assertThat(user.isLocked()).isTrue();
     }
@@ -248,7 +249,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.loginByPhone(request))
-                .isInstanceOf(AccountDeactivatedException.class);
+                .isInstanceOf(AccountDeactivatedException.class); // CHANGED: was AccountLockedException
     }
 
     @Test
@@ -259,8 +260,10 @@ class AuthServiceTest {
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.loginByPhone(request))
-                .isInstanceOf(AccountDeactivatedByAdminException.class);
+                .isInstanceOf(AccountDeactivatedByAdminException.class); // CHANGED: was AccountLockedException
     }
+
+    // --- FR-06 lockout: edge cases ---
 
     @Test
     void login_shouldStartCountingFromOne_whenPreviousLockHasExpired() {
@@ -299,7 +302,8 @@ class AuthServiceTest {
         when(userRepository.findByPhoneNumberForUpdate(request.phoneNumber())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.loginByPhone(request)).isInstanceOf(InvalidCredentialsException.class);
+        assertThatThrownBy(() -> authService.loginByPhone(request))
+                .isInstanceOf(AccountLockedException.class); // CHANGED: was InvalidCredentialsException
         assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
         assertThat(user.isLocked()).isTrue();
     }
