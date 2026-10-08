@@ -1,5 +1,7 @@
 package com.gamingcastle.bookingservice.service.controller;
 
+import com.gamingcastle.bookingservice.client.NotificationClient;
+import com.gamingcastle.bookingservice.client.PaymentClient;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.dto.WalkInBookingRequest;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
@@ -36,6 +39,12 @@ class BookingControllerIntegrationTest {
 
     @Autowired
     private GameStationRepository gameStationRepository;
+
+    @MockBean
+    private PaymentClient paymentClient;
+
+    @MockBean
+    private NotificationClient notificationClient;
 
     private GameStation station;
     private UUID customerId;

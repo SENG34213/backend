@@ -70,7 +70,7 @@ class BookingServiceTest {
             return b;
         });
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
         assertThat(response.source()).isEqualTo(BookingSource.ONLINE);
@@ -113,7 +113,7 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
     }
@@ -128,7 +128,7 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
         verify(bookingRepository).findOverlapping(station.getId(), start, end);
