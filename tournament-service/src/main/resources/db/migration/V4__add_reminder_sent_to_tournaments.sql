@@ -1,0 +1,2 @@
+ALTER TABLE tournaments
+ADD COLUMN reminder_sent BOOLEAN NOT NULL DEFAULT FALSE;
