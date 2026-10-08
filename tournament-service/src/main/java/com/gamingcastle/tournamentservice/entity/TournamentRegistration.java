@@ -32,6 +32,12 @@ public class TournamentRegistration {
     @Column(nullable = false)
     private RegistrationStatus status;
 
+    @Column
+    private String userEmail;
+
+    @Column
+    private String userName;
+
     // set once Payment Service confirms the entry-fee charge
     private UUID paymentId;
 

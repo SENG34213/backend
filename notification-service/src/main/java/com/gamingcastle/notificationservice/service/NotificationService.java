@@ -1,12 +1,6 @@
 package com.gamingcastle.notificationservice.service;
 
-import com.gamingcastle.notificationservice.dto.AccountReactivationEmailRequest;
-import com.gamingcastle.notificationservice.dto.AccountReactivationSmsRequest;
-import com.gamingcastle.notificationservice.dto.BookingEmailRequest;
-import com.gamingcastle.notificationservice.dto.EmailContent;
-import com.gamingcastle.notificationservice.dto.PasswordResetEmailRequest;
-import com.gamingcastle.notificationservice.dto.PasswordResetSmsRequest;
-import com.gamingcastle.notificationservice.dto.WelcomeEmailRequest;
+import com.gamingcastle.notificationservice.dto.*;
 import com.gamingcastle.notificationservice.enums.NotificationType;
 import org.springframework.stereotype.Service;
 
@@ -77,6 +71,38 @@ public class NotificationService {
                 request.email(),
                 NotificationType.BOOKING_CANCELLED,
                 emailTemplateService.createBookingCancelledEmail(request)
+        );
+    }
+
+    public void sendTournamentRegistrationEmail(TournamentRegistrationEmailRequest request) {
+        sendEmail(
+                request.email(),
+                NotificationType.TOURNAMENT_REGISTRATION_CONFIRMED,
+                emailTemplateService.createTournamentRegistrationEmail(request)
+        );
+    }
+
+    public void sendTournamentCancelledEmail(TournamentCancelledEmailRequest request) {
+        sendEmail(
+                request.email(),
+                NotificationType.TOURNAMENT_CANCELLED,
+                emailTemplateService.createTournamentCancelledEmail(request)
+        );
+    }
+
+    public void sendTournamentResultsEmail(TournamentResultsEmailRequest request) {
+        sendEmail(
+                request.email(),
+                NotificationType.TOURNAMENT_RESULTS_PUBLISHED,
+                emailTemplateService.createTournamentResultsEmail(request)
+        );
+    }
+
+    public void sendTournamentReminderEmail(TournamentReminderEmailRequest request) {
+        sendEmail(
+                request.email(),
+                NotificationType.TOURNAMENT_REMINDER,
+                emailTemplateService.createTournamentReminderEmail(request)
         );
     }
 

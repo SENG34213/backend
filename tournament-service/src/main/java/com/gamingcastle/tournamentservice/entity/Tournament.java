@@ -52,6 +52,10 @@ public class Tournament {
     @Column(nullable = false)
     private UUID createdByAdminId; // FR-15: admin who created it
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean reminderSent = false;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
