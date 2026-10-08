@@ -5,9 +5,9 @@ spring:
   application:
     name: booking-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/gamingcastle_bookings
-    username: gc_admin
-    password: gc_password
+    url: ${BOOKING_DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -25,3 +25,15 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 9000000   # 15 minutes, per ADR-07
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}
+
+loyalty:
+  base-url: ${LOYALTY_SERVICE_URL}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 3000

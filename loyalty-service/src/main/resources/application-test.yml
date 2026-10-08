@@ -7,6 +7,9 @@ spring:
     username: ${DB_USER:test}
     password: ${DB_PASSWORD:test}
 
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:test-secret}
+
 eureka:
   client:
     enabled: false   # integration tests don't need service discovery running
