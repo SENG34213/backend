@@ -3,10 +3,12 @@ package com.gamingcastle.loyaltyservice.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.Instant;
 import java.util.UUID;
 
-/** FR-22/FR-23: one row per user, tracking their current point balance. */
+/**
+ * One row per customer; the current points balance is cached here while the
+ * transaction table remains the audit source of truth.
+ */
 @Entity
 @Table(name = "loyalty_accounts")
 @Getter
@@ -14,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LoyaltyAccount {
+public class LoyaltyAccount extends BaseEntity {
 
     @Id
     @GeneratedValue
@@ -27,12 +29,16 @@ public class LoyaltyAccount {
     @Column(nullable = false)
     private long pointsBalance = 0;
 
+    @Builder.Default
     @Column(nullable = false)
-    private Instant updatedAt;
+    private long lifetimeEarned = 0;
 
-    @PreUpdate
-    @PrePersist
-    void onSave() {
-        updatedAt = Instant.now();
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private LoyaltyTier tier = LoyaltyTier.BRONZE;
+
+    @Version
+    @Builder.Default
+    private Long version = 0L;
 }
