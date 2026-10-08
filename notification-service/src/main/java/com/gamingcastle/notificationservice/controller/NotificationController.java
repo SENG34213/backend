@@ -1,11 +1,6 @@
 package com.gamingcastle.notificationservice.controller;
 
-import com.gamingcastle.notificationservice.dto.AccountReactivationEmailRequest;
-import com.gamingcastle.notificationservice.dto.AccountReactivationSmsRequest;
-import com.gamingcastle.notificationservice.dto.BookingEmailRequest;
-import com.gamingcastle.notificationservice.dto.PasswordResetEmailRequest;
-import com.gamingcastle.notificationservice.dto.PasswordResetSmsRequest;
-import com.gamingcastle.notificationservice.dto.WelcomeEmailRequest;
+import com.gamingcastle.notificationservice.dto.*;
 import com.gamingcastle.notificationservice.service.NotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +51,34 @@ public class NotificationController {
     @PostMapping("/booking-cancelled")
     public ResponseEntity<Void> sendBookingCancelled(@RequestBody BookingEmailRequest request) {
         notificationService.sendBookingCancelledEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/tournament-registration-confirmed")
+    public ResponseEntity<Void> sendTournamentRegistrationConfirmation(
+            @RequestBody TournamentRegistrationEmailRequest request) {
+        notificationService.sendTournamentRegistrationEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/tournament-cancelled")
+    public ResponseEntity<Void> sendTournamentCancelled(
+            @RequestBody TournamentCancelledEmailRequest request) {
+        notificationService.sendTournamentCancelledEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/tournament-results-published")
+    public ResponseEntity<Void> sendTournamentResults(
+            @RequestBody TournamentResultsEmailRequest request) {
+        notificationService.sendTournamentResultsEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/tournament-reminder")
+    public ResponseEntity<Void> sendTournamentReminder(
+            @RequestBody TournamentReminderEmailRequest request) {
+        notificationService.sendTournamentReminderEmail(request);
         return ResponseEntity.ok().build();
     }
 

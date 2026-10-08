@@ -213,6 +213,130 @@ public class EmailTemplateService {
         return new EmailContent(subject, wrapInLayout("Account Reactivation", "Account Reactivation", content));
     }
 
+    public EmailContent createTournamentRegistrationEmail(com.gamingcastle.notificationservice.dto.TournamentRegistrationEmailRequest request) {
+        String subject = "Tournament Registration Confirmed - " + request.tournamentName();
+        String content = """
+                <h2 style="margin-top:0; color:#222222;">
+                    Hi %s,
+                </h2>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    Your registration for <strong>%s</strong> has been successfully confirmed!
+                </p>
+
+                <div style="margin:25px 0; padding:20px; background-color:#f8f9fa; border-radius:8px; border-left:4px solid #6c63ff;">
+                    <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Tournament:</strong> %s</p>
+                    <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Game:</strong> %s</p>
+                    <p style="margin:0 0 10px 0; color:#444444; font-size:15px;"><strong>Start Date:</strong> %s</p>
+                    <p style="margin:0; color:#444444; font-size:15px;"><strong>Entry Fee:</strong> %s</p>
+                </div>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    Brackets and match schedules will be generated once registration closes. Good luck!
+                </p>
+                """.formatted(
+                request.customerName() != null ? request.customerName() : "Gamer",
+                request.tournamentName(),
+                request.tournamentName(),
+                request.gameTitle(),
+                request.startDate(),
+                request.entryFee()
+        );
+
+        return new EmailContent(subject, wrapInLayout("Tournament Registration Confirmed", "Tournament Registration Confirmed", content));
+    }
+
+    public EmailContent createTournamentCancelledEmail(com.gamingcastle.notificationservice.dto.TournamentCancelledEmailRequest request) {
+        String subject = "Tournament Cancelled - " + request.tournamentName();
+        String content = """
+                <h2 style="margin-top:0; color:#222222;">
+                    Hi %s,
+                </h2>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    We regret to inform you that the tournament <strong>%s</strong> has been cancelled.
+                </p>
+
+                <div style="margin:25px 0; padding:20px; background-color:#fff2f0; border-radius:8px; border-left:4px solid #ff4d4f;">
+                    <p style="margin:0; color:#444444; font-size:15px;"><strong>Reason / Details:</strong> %s</p>
+                </div>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    If an entry fee was charged, a refund will be processed to your original payment method. We apologize for any inconvenience.
+                </p>
+                """.formatted(
+                request.customerName() != null ? request.customerName() : "Gamer",
+                request.tournamentName(),
+                request.reason() != null ? request.reason() : "Cancelled by tournament administrator."
+        );
+
+        return new EmailContent(subject, wrapInLayout("Tournament Cancelled", "Tournament Notice", content));
+    }
+
+    public EmailContent createTournamentResultsEmail(com.gamingcastle.notificationservice.dto.TournamentResultsEmailRequest request) {
+        String subject = "Tournament Results Published - " + request.tournamentName();
+        String content = """
+                <h2 style="margin-top:0; color:#222222;">
+                    Hi %s,
+                </h2>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    The results for <strong>%s</strong> (%s) have been finalized!
+                </p>
+
+                <div style="margin:25px 0; padding:20px; background-color:#f6ffed; border-radius:8px; border-left:4px solid #52c41a;">
+                    <p style="margin:0 0 10px 0; color:#444444; font-size:16px;">🏆 <strong>Tournament Champion:</strong> %s</p>
+                    <p style="margin:0; color:#555555; font-size:14px;">%s</p>
+                </div>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    Thank you to all participants for competing. Check the full bracket on the Gaming Castle platform!
+                </p>
+                """.formatted(
+                request.customerName() != null ? request.customerName() : "Gamer",
+                request.tournamentName(),
+                request.gameTitle() != null ? request.gameTitle() : "Tournament",
+                request.winnerName() != null ? request.winnerName() : "TBD",
+                request.message() != null ? request.message() : "Congratulations to the winners!"
+        );
+
+        return new EmailContent(subject, wrapInLayout("Tournament Results", "Tournament Results", content));
+    }
+
+    public EmailContent createTournamentReminderEmail(com.gamingcastle.notificationservice.dto.TournamentReminderEmailRequest request) {
+        String subject = "⏰ 2-Hour Reminder: Upcoming Tournament " + request.tournamentName();
+        String content = """
+                <h2 style="margin-top:0; color:#222222;">
+                    Hi %s,
+                </h2>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    Your upcoming tournament <strong>%s</strong> (%s) starts in <strong>2 hours</strong>!
+                </p>
+
+                <div style="margin:25px 0; padding:20px; background-color:#f0f5ff; border-radius:8px; border-left:4px solid #1890ff;">
+                    <p style="margin:0 0 8px 0; color:#333333; font-size:15px;">🎮 <strong>Game Title:</strong> %s</p>
+                    <p style="margin:0 0 8px 0; color:#333333; font-size:15px;">🕒 <strong>Start Time:</strong> %s</p>
+                    <p style="margin:0 0 8px 0; color:#333333; font-size:15px;">⚔️ <strong>First Round Opponent:</strong> %s</p>
+                    <p style="margin:0; color:#333333; font-size:15px;">📊 <strong>Match Info:</strong> %s</p>
+                </div>
+
+                <p style="color:#555555; font-size:16px; line-height:1.6;">
+                    Please log into Gaming Castle 15 minutes before the tournament start time to check in. Good luck!
+                </p>
+                """.formatted(
+                request.customerName() != null ? request.customerName() : "Gamer",
+                request.tournamentName(),
+                request.gameTitle() != null ? request.gameTitle() : "Tournament",
+                request.gameTitle() != null ? request.gameTitle() : "N/A",
+                request.startDate() != null ? request.startDate() : "Starting soon",
+                request.opponentName() != null ? request.opponentName() : "TBD",
+                request.roundInfo() != null ? request.roundInfo() : "Round 1"
+        );
+
+        return new EmailContent(subject, wrapInLayout("Tournament Reminder", "Tournament Starting Soon", content));
+    }
+
     private String wrapInLayout(String pageTitle, String subtitle, String content) {
         return """
                 <!DOCTYPE html>
