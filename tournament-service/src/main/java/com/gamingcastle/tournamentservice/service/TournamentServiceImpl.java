@@ -3,17 +3,18 @@ package com.gamingcastle.tournamentservice.service;
 import com.gamingcastle.tournamentservice.dto.TournamentRequest;
 import com.gamingcastle.tournamentservice.dto.TournamentResponse;
 import com.gamingcastle.tournamentservice.dto.TournamentStatusUpdateRequest;
-import com.gamingcastle.tournamentservice.entity.Tournament;
-import com.gamingcastle.tournamentservice.entity.TournamentStatus;
+import com.gamingcastle.tournamentservice.entity.*;
 import com.gamingcastle.tournamentservice.exception.TournamentNotFoundException;
 import com.gamingcastle.tournamentservice.repository.TournamentRepository;
 import com.gamingcastle.tournamentservice.client.NotificationClient;
 import com.gamingcastle.tournamentservice.client.UserClient;
-import com.gamingcastle.tournamentservice.entity.RegistrationStatus;
 import com.gamingcastle.tournamentservice.repository.TournamentRegistrationRepository;
+import com.gamingcastle.tournamentservice.repository.BracketRepository;
+import com.gamingcastle.tournamentservice.repository.MatchRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,17 +24,23 @@ public class TournamentServiceImpl implements TournamentService {
 
     private final TournamentRepository tournamentRepository;
     private final TournamentRegistrationRepository registrationRepository;
+    private final BracketRepository bracketRepository;
+    private final MatchRepository matchRepository;
     private final NotificationClient notificationClient;
     private final UserClient userClient;
 
     public TournamentServiceImpl(
             TournamentRepository tournamentRepository,
             TournamentRegistrationRepository registrationRepository,
+            BracketRepository bracketRepository,
+            MatchRepository matchRepository,
             NotificationClient notificationClient,
             UserClient userClient
     ) {
         this.tournamentRepository = tournamentRepository;
         this.registrationRepository = registrationRepository;
+        this.bracketRepository = bracketRepository;
+        this.matchRepository = matchRepository;
         this.notificationClient = notificationClient;
         this.userClient = userClient;
     }
@@ -162,5 +169,102 @@ public class TournamentServiceImpl implements TournamentService {
                 t.getCreatedAt(),
                 isRegistrationOpen
         );
+    }
+
+    @Override
+    @Transactional
+    public void processUpcomingPreTournamentReminders() {
+        // Find tournaments starting in 2 hours or less that haven't sent reminders yet
+        Instant targetThreshold = Instant.now().plus(2, ChronoUnit.HOURS);
+        List<Tournament> upcomingTournaments = tournamentRepository.findByStartDateLessThanEqualAndReminderSentFalse(targetThreshold);
+
+        for (Tournament tournament : upcomingTournaments) {
+            if (tournament.getStatus() == TournamentStatus.UPCOMING) {
+                sendPreTournamentReminders(tournament.getId());
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void sendPreTournamentReminders(UUID tournamentId) {
+        Tournament tournament = tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + tournamentId));
+
+        var registrations = registrationRepository.findByTournamentId(tournamentId);
+        List<TournamentRegistration> confirmedRegs = registrations.stream()
+                .filter(r -> r.getStatus() == RegistrationStatus.CONFIRMED)
+                .collect(Collectors.toList());
+
+        if (confirmedRegs.isEmpty()) {
+            tournament.setReminderSent(true);
+            tournamentRepository.save(tournament);
+            return;
+        }
+
+        var bracketOpt = bracketRepository.findByTournamentId(tournamentId);
+        List<Match> round1Matches = bracketOpt.isPresent()
+                ? matchRepository.findByBracketIdAndRound(bracketOpt.get().getId(), 1)
+                : List.of();
+
+        for (var reg : confirmedRegs) {
+            UUID userId = reg.getUserId();
+            String opponentName = "TBD / Bracket Pending";
+            String roundInfo = "Round 1";
+
+            if (!round1Matches.isEmpty()) {
+                Match userMatch = round1Matches.stream()
+                        .filter(m -> userId.equals(m.getParticipant1Id()) || userId.equals(m.getParticipant2Id()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (userMatch != null) {
+                    roundInfo = "Round " + userMatch.getRound();
+                    UUID opponentId = userId.equals(userMatch.getParticipant1Id()) ? userMatch.getParticipant2Id() : userMatch.getParticipant1Id();
+                    if (opponentId == null) {
+                        opponentName = "Bye (Auto-Advance)";
+                    } else {
+                        var oppRegOpt = confirmedRegs.stream()
+                                .filter(r -> opponentId.equals(r.getUserId()))
+                                .findFirst();
+                        if (oppRegOpt.isPresent() && oppRegOpt.get().getUserName() != null && !oppRegOpt.get().getUserName().isBlank()) {
+                            opponentName = oppRegOpt.get().getUserName();
+                        } else {
+                            var oppUserOpt = userClient.getUserById(opponentId);
+                            opponentName = oppUserOpt.map(UserClient.UserSummaryDto::fullName)
+                                    .orElse("Opponent (" + opponentId.toString().substring(0, 8) + ")");
+                        }
+                    }
+                }
+            }
+
+            String recipientEmail = reg.getUserEmail();
+            String recipientName = reg.getUserName();
+
+            if (recipientEmail == null || recipientEmail.isBlank()) {
+                var userOpt = userClient.getUserById(userId);
+                recipientEmail = userOpt.map(UserClient.UserSummaryDto::email).orElse(null);
+                if (recipientName == null || recipientName.isBlank()) {
+                    recipientName = userOpt.map(UserClient.UserSummaryDto::fullName).orElse("Gamer");
+                }
+            }
+
+            if (recipientEmail != null && !recipientEmail.isBlank()) {
+                notificationClient.sendTournamentReminder(
+                        new NotificationClient.TournamentReminderEmailRequest(
+                                recipientEmail,
+                                recipientName != null ? recipientName : "Gamer",
+                                tournament.getName(),
+                                tournament.getGameTitle(),
+                                tournament.getStartDate().toString(),
+                                opponentName,
+                                roundInfo
+                        )
+                );
+            }
+        }
+
+        tournament.setReminderSent(true);
+        tournamentRepository.save(tournament);
     }
 }

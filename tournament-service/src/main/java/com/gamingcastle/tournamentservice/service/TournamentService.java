@@ -13,4 +13,6 @@ public interface TournamentService {
     TournamentResponse updateTournamentStatus(UUID id, TournamentStatusUpdateRequest request);
     TournamentResponse cancelTournament(UUID id);
     boolean isRegistrationOpen(UUID id);
+    void sendPreTournamentReminders(UUID tournamentId);
+    void processUpcomingPreTournamentReminders();
 }

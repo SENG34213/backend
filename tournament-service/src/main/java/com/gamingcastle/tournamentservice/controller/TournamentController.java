@@ -127,4 +127,12 @@ public class TournamentController {
     ) {
         return ResponseEntity.ok(bracketService.recordMatchResult(id, matchId, request));
     }
+
+    /** Pre-tournament 2-hour reminder notification endpoint (can be triggered manually by Admin or system). */
+    @PostMapping("/{id}/notify-reminders")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> sendPreTournamentReminders(@PathVariable UUID id) {
+        tournamentService.sendPreTournamentReminders(id);
+        return ResponseEntity.ok().build();
+    }
 }

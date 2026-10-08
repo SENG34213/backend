@@ -3,7 +3,10 @@ package com.gamingcastle.tournamentservice;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 @SpringBootApplication
+@EnableScheduling
 public class TournamentServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(TournamentServiceApplication.class, args);
