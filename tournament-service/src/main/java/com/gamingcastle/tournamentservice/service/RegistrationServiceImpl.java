@@ -12,6 +12,7 @@ import com.gamingcastle.tournamentservice.exception.TournamentNotFoundException;
 import com.gamingcastle.tournamentservice.repository.TournamentRegistrationRepository;
 import com.gamingcastle.tournamentservice.repository.TournamentRepository;
 import com.gamingcastle.tournamentservice.client.NotificationClient;
+import com.gamingcastle.tournamentservice.client.PaymentClient;
 import com.gamingcastle.tournamentservice.client.UserClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,17 +30,20 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final TournamentRegistrationRepository registrationRepository;
     private final NotificationClient notificationClient;
     private final UserClient userClient;
+    private final PaymentClient paymentClient;
 
     public RegistrationServiceImpl(
             TournamentRepository tournamentRepository,
             TournamentRegistrationRepository registrationRepository,
             NotificationClient notificationClient,
-            UserClient userClient
+            UserClient userClient,
+            PaymentClient paymentClient
     ) {
         this.tournamentRepository = tournamentRepository;
         this.registrationRepository = registrationRepository;
         this.notificationClient = notificationClient;
         this.userClient = userClient;
+        this.paymentClient = paymentClient;
     }
 
     @Override
@@ -103,8 +107,18 @@ public class RegistrationServiceImpl implements RegistrationService {
         registration = registrationRepository.save(registration);
 
         // 6. Call Payment Service for entry fee (UC-08: process payment step)
-        //    TODO (feature/43, blocked by PM-1/PM-2): replace stub with PaymentClient call
-        UUID paymentId = processEntryFeePayment(tournament.getEntryFee(), userId, registration.getId());
+        // Delegates to PaymentClient which calls POST /api/payments on payment-service.
+        // Uses idempotency key (userId + registrationId) to prevent double-charges on retries.
+        // On failure: marks registration CANCELLED to avoid orphaned PENDING_PAYMENT records,
+        // then re-throws PaymentFailedException (→ HTTP 402) to the caller.
+        UUID paymentId;
+        try {
+            paymentId = paymentClient.chargeEntryFee(tournament.getEntryFee(), userId, registration.getId());
+        } catch (com.gamingcastle.tournamentservice.exception.PaymentFailedException e) {
+            registration.setStatus(RegistrationStatus.CANCELLED);
+            registrationRepository.save(registration);
+            throw e;
+        }
 
         // 7. Payment succeeded — confirm registration and increment participantCount (activity diagram step)
         registration.setPaymentId(paymentId);
@@ -114,7 +128,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         registrationRepository.save(registration);
         tournamentRepository.save(tournament);
 
-        // 8. Notification (feature/45): send tournament-registration-confirmed notification (activity diagram step 11)
+        // 8. Notification: send tournament-registration-confirmed notification (activity diagram step 11)
         sendRegistrationConfirmedNotification(tournament, resolvedEmail, resolvedName);
 
         return mapToResponse(registration);
@@ -154,17 +168,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Payment Service integration stub.
-     * TODO (feature/43): replace with PaymentClient.chargeEntryFee(amount, userId, registrationId)
-     * once PM-1/PM-2 (Payment Service checkout) is built.
-     * Throws PaymentFailedException on failure so the caller (UC-08 alt flow) is notified correctly.
-     */
-    private UUID processEntryFeePayment(java.math.BigDecimal amount, UUID userId, UUID registrationId) {
-        // Stub: simulate successful payment and return a fake paymentId
-        // Real implementation: call payment-service REST endpoint via Feign/RestClient
-        return UUID.randomUUID();
-    }
+    // processEntryFeePayment stub removed — real payment handled by PaymentClient.chargeEntryFee()
 
     private RegistrationResponse mapToResponse(TournamentRegistration r) {
         return new RegistrationResponse(

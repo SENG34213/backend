@@ -29,3 +29,11 @@ eureka:
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET:}
 
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 9000000   # 15 minutes, per ADR-07
+
+# Base URL for inter-service HTTP calls (override via env var for Docker/cloud)
+services:
+  payment:
+    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
