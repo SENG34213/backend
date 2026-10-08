@@ -73,7 +73,7 @@ class BookingServiceTest {
         BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
-        assertThat(response.source()).isEqualTo(BookingSource.ONLINE);
+        assertThat(response.source()).isEqualTo(BookingSource.WALK_IN);
         assertThat(response.stationCode()).isEqualTo("PC-01");
         verify(bookingRepository).save(any(Booking.class));
     }
