@@ -38,6 +38,13 @@ public class Tournament {
     @Column(nullable = false)
     private int maxParticipants;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private int participantCount = 0;
+
+    @Column(nullable = false)
+    private Instant registrationDeadline;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TournamentStatus status;
