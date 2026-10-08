@@ -2,6 +2,7 @@ package com.gamingcastle.bookingservice.service.service;
 
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
+import com.gamingcastle.bookingservice.client.LoyaltyClient;
 import com.gamingcastle.bookingservice.entity.*;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
@@ -30,6 +31,7 @@ class BookingServiceTest {
 
     @Mock private BookingRepository bookingRepository;
     @Mock private GameStationRepository gameStationRepository;
+    @Mock private LoyaltyClient loyaltyClient;
 
     private BookingService bookingService;
 
@@ -39,7 +41,7 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository);
+        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository, loyaltyClient);
 
         station = GameStation.builder()
                 .id(UUID.randomUUID())
@@ -157,5 +159,26 @@ class BookingServiceTest {
                 .isInstanceOf(BookingException.class)
                 .hasMessageContaining("endTime must be after startTime");
         verifyNoInteractions(gameStationRepository);
+    }
+
+    @Test
+    void cancelBooking_shouldReverseLoyaltyAfterCancellation() {
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.CONFIRMED)
+                .source(BookingSource.ONLINE)
+                .build();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BookingResponse response = bookingService.cancelBooking(bookingId, userId, false);
+
+        assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
+        verify(loyaltyClient).reverse(bookingId, "Booking cancelled");
     }
 }

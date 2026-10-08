@@ -80,10 +80,11 @@ export BOOKING_DB_USER=gc_admin
 export BOOKING_DB_PASSWORD=replace-with-your-local-password
 export JWT_SECRET=replace-with-a-strong-secret
 export GATEWAY_INTERNAL_SECRET=replace-with-a-strong-gateway-secret
+export LOYALTY_BASE_URL=http://localhost:8085
 mvn spring-boot:run
 ```
 
-The same pattern applies to `payment-service`, `tournament-service`, `loyalty-service` and `notification-service`, with their corresponding `*_DB_*` variables or generic `DB_*` variables.
+Set the same `GATEWAY_INTERNAL_SECRET` and `LOYALTY_BASE_URL` when running `payment-service`; both booking and payment call loyalty directly for booking cancellation and payment redemption/earning. `LOYALTY_BASE_URL` should be the service origin (for example, `http://localhost:8085`), not the `/api` path. The same database-variable pattern applies to `tournament-service`, `loyalty-service` and `notification-service`.
 
 ## Main API entry points
 

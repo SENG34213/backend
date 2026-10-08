@@ -51,7 +51,7 @@ public class LoyaltyClient {
 
         try {
             ResponseEntity<ReserveResponse> response = post(
-                    "/internal/loyalty/redeem/reserve",
+                    "/api/internal/loyalty/redeem/reserve",
                     request,
                     ReserveResponse.class
             );
@@ -70,17 +70,17 @@ public class LoyaltyClient {
     }
 
     public void confirm(UUID bookingId) {
-        sendWithRetry("confirm", null, bookingId, null, "/internal/loyalty/redeem/confirm",
+        sendWithRetry("confirm", null, bookingId, null, "/api/internal/loyalty/redeem/confirm",
                 new ConfirmRequest(bookingId));
     }
 
     public void release(UUID bookingId, String reason) {
-        sendWithRetry("release", null, bookingId, null, "/internal/loyalty/redeem/release",
+        sendWithRetry("release", null, bookingId, null, "/api/internal/loyalty/redeem/release",
                 new ReleaseRequest(bookingId, reason));
     }
 
     public void award(UUID userId, UUID bookingId, BigDecimal amountPaid, UUID paymentId) {
-        sendWithRetry("award", userId, bookingId, paymentId, "/internal/loyalty/award",
+        sendWithRetry("award", userId, bookingId, paymentId, "/api/internal/loyalty/award",
                 new AwardRequest(userId, bookingId, amountPaid, paymentId));
     }
 
