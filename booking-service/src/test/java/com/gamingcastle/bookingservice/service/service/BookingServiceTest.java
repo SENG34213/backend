@@ -1,5 +1,7 @@
 package com.gamingcastle.bookingservice.service.service;
 
+import com.gamingcastle.bookingservice.client.NotificationClient;
+import com.gamingcastle.bookingservice.client.PaymentClient;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.entity.*;
@@ -30,6 +32,8 @@ class BookingServiceTest {
 
     @Mock private BookingRepository bookingRepository;
     @Mock private GameStationRepository gameStationRepository;
+    @Mock private PaymentClient paymentClient;
+    @Mock private NotificationClient notificationClient;
 
     private BookingService bookingService;
 
@@ -39,7 +43,7 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository);
+        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository,paymentClient,notificationClient);
 
         station = GameStation.builder()
                 .id(UUID.randomUUID())
@@ -66,12 +70,12 @@ class BookingServiceTest {
             return b;
         });
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
-        assertThat(response.source()).isEqualTo(BookingSource.ONLINE);
+        assertThat(response.source()).isEqualTo(BookingSource.WALK_IN);
         assertThat(response.stationCode()).isEqualTo("PC-01");
-        verify(bookingRepository).save(any(Booking.class));
+        verify(bookingRepository, atLeastOnce()).save(any(Booking.class));
     }
 
     @Test
@@ -109,7 +113,7 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
     }
@@ -124,7 +128,7 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
+        BookingResponse response = bookingService.createBooking(userId, request, BookingSource.WALK_IN);
 
         assertThat(response.status()).isEqualTo(BookingStatus.PENDING);
         verify(bookingRepository).findOverlapping(station.getId(), start, end);

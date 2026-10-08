@@ -40,7 +40,7 @@ public class BookingController {
         this.notificationClient = notificationClient;
     }
 
-    /** FR-08: customer self-service booking. */
+    /** FR-08: customer self-service booking — payment is charged automatically. */
     @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
@@ -48,21 +48,10 @@ public class BookingController {
             @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId,
             @RequestHeader(value = "X-User-Email", required = false) String email,
             @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
+        // BookingServiceImpl.createBooking() handles payment + confirmation email internally.
+        // ONLINE bookings: PENDING → payment-service charged → CONFIRMED + email sent.
+        // WALK_IN bookings: remains PENDING until admin calls PATCH /{id}/confirm.
         BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
-        
-        if (email != null && !email.isBlank()) {
-            String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
-                .format(response.startTime());
-            String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                .withZone(java.time.ZoneId.systemDefault())
-                .format(response.startTime());
-            
-            notificationClient.sendBookingConfirmation(new NotificationClient.BookingEmailRequest(
-                email, fullName, response.id().toString(), response.stationCode(), 
-                dateStr, timeSlot, "LKR. 1,000.00"));
-        }
-        
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
