@@ -130,7 +130,7 @@ public class NotificationService {
             notificationRecordService.recordSuccess(type, recipient);
         } catch (Exception exception) {
             notificationRecordService.recordFailure(type, recipient, exception.getMessage());
-            throw exception;
+            // Do not let a notification delivery failure break the primary business flow.
         }
     }
 
@@ -140,7 +140,7 @@ public class NotificationService {
             notificationRecordService.recordSuccess(type, recipient);
         } catch (Exception exception) {
             notificationRecordService.recordFailure(type, recipient, exception.getMessage());
-            throw exception;
+            // Do not let notification failures break account or booking workflows.
         }
     }
 }
