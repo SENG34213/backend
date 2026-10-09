@@ -2,6 +2,7 @@ package com.gamingcastle.bookingservice.service.controller;
 
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
+import com.gamingcastle.bookingservice.client.UserClient;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.dto.WalkInBookingRequest;
@@ -45,6 +46,9 @@ class BookingControllerIntegrationTest {
 
     @MockBean
     private NotificationClient notificationClient;
+
+    @MockBean
+    private UserClient userClient;
 
     private GameStation station;
     private UUID customerId;
