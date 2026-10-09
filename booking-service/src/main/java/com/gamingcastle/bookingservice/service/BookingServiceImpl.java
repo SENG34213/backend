@@ -11,6 +11,7 @@ import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
+import com.gamingcastle.bookingservice.client.UserClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,16 +38,19 @@ public class BookingServiceImpl implements BookingService {
     private final GameStationRepository gameStationRepository;
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
+    private final UserClient userClient;
 
     public BookingServiceImpl(
             BookingRepository bookingRepository,
             GameStationRepository gameStationRepository,
             PaymentClient paymentClient,
-            NotificationClient notificationClient) {
+            NotificationClient notificationClient,
+            UserClient userClient) {
         this.bookingRepository = bookingRepository;
         this.gameStationRepository = gameStationRepository;
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
+        this.userClient = userClient;
     }
 
     @Override
@@ -126,9 +130,23 @@ public class BookingServiceImpl implements BookingService {
         try {
             DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
             DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+
+            String email = null;
+            String fullName = null;
+            var user = userClient.getUserById(booking.getUserId());
+            if (user.isPresent()) {
+                email = user.get().email();
+                fullName = user.get().fullName();
+            }
+
+            if (email == null || email.isBlank()) {
+                System.err.println("[BookingService] Skipping booking confirmation email for bookingId=" + booking.getId() + ": no user email found");
+                return;
+            }
+
             notificationClient.sendBookingConfirmation(new NotificationClient.BookingEmailRequest(
-                    null,   // email resolved by NotificationClient or populated via header in controller
-                    null,
+                    email,
+                    fullName,
                     booking.getId().toString(),
                     booking.getStation().getStationCode(),
                     dateFmt.format(booking.getStartTime()),

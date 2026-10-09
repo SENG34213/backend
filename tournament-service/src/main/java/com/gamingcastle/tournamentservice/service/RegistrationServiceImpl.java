@@ -14,6 +14,7 @@ import com.gamingcastle.tournamentservice.repository.TournamentRepository;
 import com.gamingcastle.tournamentservice.client.NotificationClient;
 import com.gamingcastle.tournamentservice.client.PaymentClient;
 import com.gamingcastle.tournamentservice.client.UserClient;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -125,8 +126,13 @@ public class RegistrationServiceImpl implements RegistrationService {
         registration.setStatus(RegistrationStatus.CONFIRMED);
         tournament.setParticipantCount(tournament.getParticipantCount() + 1);
 
-        registrationRepository.save(registration);
-        tournamentRepository.save(tournament);
+        try {
+            registrationRepository.saveAndFlush(registration);
+            tournamentRepository.saveAndFlush(tournament);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateRegistrationException(
+                    "User " + userId + " is already registered for tournament: " + tournament.getName());
+        }
 
         // 8. Notification: send tournament-registration-confirmed notification (activity diagram step 11)
         sendRegistrationConfirmedNotification(tournament, resolvedEmail, resolvedName);

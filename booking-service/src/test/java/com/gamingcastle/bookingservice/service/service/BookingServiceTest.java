@@ -2,6 +2,7 @@ package com.gamingcastle.bookingservice.service.service;
 
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
+import com.gamingcastle.bookingservice.client.UserClient;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.entity.*;
@@ -34,6 +35,7 @@ class BookingServiceTest {
     @Mock private GameStationRepository gameStationRepository;
     @Mock private PaymentClient paymentClient;
     @Mock private NotificationClient notificationClient;
+    @Mock private UserClient userClient;
 
     private BookingService bookingService;
 
@@ -43,7 +45,7 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository,paymentClient,notificationClient);
+        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository,paymentClient,notificationClient,userClient);
 
         station = GameStation.builder()
                 .id(UUID.randomUUID())

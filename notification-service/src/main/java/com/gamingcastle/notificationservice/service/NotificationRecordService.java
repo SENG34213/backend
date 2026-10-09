@@ -4,6 +4,8 @@ import com.gamingcastle.notificationservice.entity.Notification;
 import com.gamingcastle.notificationservice.enums.NotificationStatus;
 import com.gamingcastle.notificationservice.enums.NotificationType;
 import com.gamingcastle.notificationservice.repository.NotificationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -11,6 +13,8 @@ import java.util.UUID;
 
 @Service
 public class NotificationRecordService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationRecordService.class);
 
     private final NotificationRepository notificationRepository;
 
@@ -27,6 +31,11 @@ public class NotificationRecordService {
     }
 
     private void save(NotificationType type, String recipient, NotificationStatus status, String error) {
+        if (recipient == null || recipient.isBlank()) {
+            log.warn("Skipping notification audit record for {} because recipient email is blank", type);
+            return;
+        }
+
         Instant now = Instant.now();
 
         Notification notification = Notification.builder()
