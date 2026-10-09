@@ -26,8 +26,11 @@ eureka:
   instance:
     prefer-ip-address: true
 
-gateway:
-  internal-secret: ${GATEWAY_INTERNAL_SECRET}
-
 loyalty:
   base-url: ${LOYALTY_BASE_URL:http://localhost:8085}
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 9000000
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:}
