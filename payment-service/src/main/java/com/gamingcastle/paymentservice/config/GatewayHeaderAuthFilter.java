@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,6 +23,10 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
 
     public static final String USER_ID_HEADER = "X-User-Id";
     public static final String USER_ROLE_HEADER = "X-User-Role";
+    public static final String GATEWAY_SECRET_HEADER = "X-Gateway-Secret";
+
+    @Value("${gateway.internal-secret:}")
+    private String expectedGatewaySecret;
 
     @Override
     protected void doFilterInternal(
@@ -39,12 +44,18 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        String gatewaySecret = request.getHeader(GATEWAY_SECRET_HEADER);
         String userIdHeader = request.getHeader(USER_ID_HEADER);
         String roleHeader = request.getHeader(USER_ROLE_HEADER);
 
+        if (gatewaySecret == null || !gatewaySecret.equals(expectedGatewaySecret)) {
+            unauthorized(response, "Request must come through the API Gateway");
+            return;
+        }
+
         if (userIdHeader == null || roleHeader == null
                 || userIdHeader.isBlank() || roleHeader.isBlank()) {
-            filterChain.doFilter(request, response);
+            unauthorized(response, "Missing or invalid gateway identity headers");
             return;
         }
 
@@ -53,7 +64,7 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
             String role = roleHeader.trim().toUpperCase(Locale.ROOT);
 
             if (!Set.of("CUSTOMER", "ADMIN").contains(role)) {
-                filterChain.doFilter(request, response);
+                unauthorized(response, "Invalid gateway identity headers");
                 return;
             }
 
@@ -68,14 +79,18 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
 
         } catch (IllegalArgumentException ex) {
             SecurityContextHolder.clearContext();
-
-            response.sendError(
-                    HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid gateway identity headers");
-
+            unauthorized(response, "Invalid gateway identity headers");
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    private void unauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write(
+                "{\"error\":\"UNAUTHORIZED\",\"message\":\"" + message + "\"}"
+        );
     }
 }
 

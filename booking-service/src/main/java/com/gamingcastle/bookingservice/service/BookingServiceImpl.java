@@ -97,7 +97,7 @@ public class BookingServiceImpl implements BookingService {
 
             UUID paymentId;
             try {
-                paymentId = paymentClient.chargeBookingFee(amount, userId, booking.getId(), "CARD");
+                paymentId = paymentClient.chargeBookingFee(amount, userId, booking.getId(), "ONLINE");
             } catch (BookingException e) {
                 booking.setStatus(BookingStatus.CANCELLED);
                 bookingRepository.save(booking);
