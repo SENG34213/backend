@@ -2,8 +2,10 @@ package com.gamingcastle.paymentservice.service;
 
 import com.gamingcastle.paymentservice.dto.request.PaymentRequest;
 import com.gamingcastle.paymentservice.dto.response.PaymentResponse;
+import com.gamingcastle.paymentservice.client.LoyaltyClient;
 import com.gamingcastle.paymentservice.entity.Payment;
 import com.gamingcastle.paymentservice.entity.PaymentStatus;
+import com.gamingcastle.paymentservice.entity.ReferenceType;
 import com.gamingcastle.paymentservice.gateway.PaymentGateway;
 import com.gamingcastle.paymentservice.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
+    private final LoyaltyClient loyaltyClient;
 
     @Override
     @Transactional
@@ -36,17 +39,50 @@ public class PaymentServiceImpl implements PaymentService {
 
         validateAmount(request.getAmount());
 
+        boolean bookingPayment = request.getReferenceType() == ReferenceType.BOOKING;
+        int pointsToRedeem = request.getLoyaltyPointsToRedeem() == null
+                ? 0 : request.getLoyaltyPointsToRedeem();
+        if (pointsToRedeem < 0) {
+            throw new IllegalArgumentException("Loyalty points to redeem cannot be negative");
+        }
+
+        LoyaltyClient.ReserveResponse reservation = null;
+        if (bookingPayment && pointsToRedeem > 0) {
+            reservation = loyaltyClient.reserve(
+                    userId, request.getReferenceId(), request.getAmount(), pointsToRedeem);
+        }
+
+        BigDecimal payableAmount = reservation == null
+                ? request.getAmount() : reservation.payableAmount();
+        if (payableAmount == null || payableAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            if (reservation != null) {
+                loyaltyClient.release(request.getReferenceId(), "Invalid payable amount returned by loyalty service");
+            }
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+
         Payment payment = Payment.builder()
                 .userId(userId)
                 .referenceType(request.getReferenceType())
                 .referenceId(request.getReferenceId())
-                .amount(request.getAmount())
+                .amount(payableAmount)
+                .originalAmount(request.getAmount())
+                .loyaltyPointsUsed(reservation == null ? 0 : Math.toIntExact(reservation.pointsReserved()))
+                .loyaltyDiscount(reservation == null ? BigDecimal.ZERO : reservation.discountAmount())
                 .method(request.getMethod())
                 .status(PaymentStatus.PENDING)
                 .idempotencyKey(request.getIdempotencyKey())
                 .build();
 
-        boolean successful = paymentGateway.processPayment(request.getAmount());
+        boolean successful;
+        try {
+            successful = paymentGateway.processPayment(payableAmount);
+        } catch (RuntimeException exception) {
+            if (reservation != null) {
+                loyaltyClient.release(request.getReferenceId(), "Gateway failure during payment processing");
+            }
+            throw exception;
+        }
 
         if (successful) {
             payment.setStatus(PaymentStatus.SUCCESS);
@@ -55,8 +91,18 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setStatus(PaymentStatus.FAILED);
         }
 
+        if (!successful && reservation != null) {
+            loyaltyClient.release(request.getReferenceId(), "Payment failed");
+        }
+
         try {
             Payment savedPayment = paymentRepository.save(payment);
+            if (successful && bookingPayment) {
+                if (reservation != null) {
+                    loyaltyClient.confirm(request.getReferenceId());
+                }
+                loyaltyClient.award(userId, request.getReferenceId(), payableAmount, savedPayment.getId());
+            }
             return toResponse(savedPayment);
 
         } catch (DataIntegrityViolationException exception) {
@@ -82,12 +128,20 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         validateAmount(request.getAmount());
+        boolean bookingPayment = request.getReferenceType() == ReferenceType.BOOKING;
+        UUID customerUserId = request.getCustomerUserId();
+        if (bookingPayment && customerUserId == null) {
+            throw new IllegalArgumentException("customerUserId is required for booking cash payments");
+        }
+        UUID paymentUserId = customerUserId == null ? userId : customerUserId;
 
         Payment payment = Payment.builder()
-                .userId(userId)
+                .userId(paymentUserId)
                 .referenceType(request.getReferenceType())
                 .referenceId(request.getReferenceId())
                 .amount(request.getAmount())
+                .originalAmount(request.getAmount())
+                .recordedBy(userId)
                 .method(request.getMethod())
                 .status(PaymentStatus.SUCCESS)
                 .idempotencyKey(request.getIdempotencyKey())
@@ -96,6 +150,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         try {
             Payment savedPayment = paymentRepository.save(payment);
+            if (bookingPayment) {
+                loyaltyClient.award(paymentUserId, request.getReferenceId(), request.getAmount(), savedPayment.getId());
+            }
             return toResponse(savedPayment);
 
         } catch (DataIntegrityViolationException exception) {
@@ -126,6 +183,9 @@ public class PaymentServiceImpl implements PaymentService {
                 .referenceType(payment.getReferenceType())
                 .referenceId(payment.getReferenceId())
                 .amount(payment.getAmount())
+                .originalAmount(payment.getOriginalAmount())
+                .loyaltyPointsUsed(payment.getLoyaltyPointsUsed())
+                .loyaltyDiscount(payment.getLoyaltyDiscount())
                 .method(payment.getMethod())
                 .status(payment.getStatus())
                 .idempotencyKey(payment.getIdempotencyKey())

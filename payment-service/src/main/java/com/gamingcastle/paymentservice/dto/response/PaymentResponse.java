@@ -28,6 +28,12 @@ public class PaymentResponse {
 
     private BigDecimal amount;
 
+    private BigDecimal originalAmount;
+
+    private Integer loyaltyPointsUsed;
+
+    private BigDecimal loyaltyDiscount;
+
     private PaymentMethod method;
 
     private PaymentStatus status;

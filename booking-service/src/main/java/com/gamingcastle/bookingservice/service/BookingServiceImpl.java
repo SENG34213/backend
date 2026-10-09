@@ -2,6 +2,7 @@ package com.gamingcastle.bookingservice.service;
 
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
+import com.gamingcastle.bookingservice.client.LoyaltyClient;
 import com.gamingcastle.bookingservice.entity.Booking;
 import com.gamingcastle.bookingservice.entity.BookingSource;
 import com.gamingcastle.bookingservice.entity.BookingStatus;
@@ -36,6 +37,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
+    private final LoyaltyClient loyaltyClient;
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
     private final UserClient userClient;
@@ -43,11 +45,13 @@ public class BookingServiceImpl implements BookingService {
     public BookingServiceImpl(
             BookingRepository bookingRepository,
             GameStationRepository gameStationRepository,
+            LoyaltyClient loyaltyClient,
             PaymentClient paymentClient,
             NotificationClient notificationClient,
             UserClient userClient) {
         this.bookingRepository = bookingRepository;
         this.gameStationRepository = gameStationRepository;
+        this.loyaltyClient = loyaltyClient;
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
         this.userClient = userClient;
@@ -190,6 +194,7 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setStatus(BookingStatus.CANCELLED);
         booking = bookingRepository.save(booking);
+        loyaltyClient.reverse(bookingId, "Booking cancelled");
         return BookingResponse.from(booking);
     }
 

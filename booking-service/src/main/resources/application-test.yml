@@ -10,3 +10,9 @@ spring:
 eureka:
   client:
     enabled: false   # integration tests don't need service discovery running
+
+gateway:
+  internal-secret: test-gateway-secret
+
+loyalty:
+  base-url: http://localhost:8085

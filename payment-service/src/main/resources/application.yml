@@ -26,6 +26,8 @@ eureka:
   instance:
     prefer-ip-address: true
 
+loyalty:
+  base-url: ${LOYALTY_BASE_URL:http://localhost:8085}
 jwt:
   secret: ${JWT_SECRET}
   expiration-ms: 9000000

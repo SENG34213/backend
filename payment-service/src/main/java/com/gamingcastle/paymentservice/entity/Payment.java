@@ -45,6 +45,20 @@ public class Payment {
     @Column(nullable = false)
     private BigDecimal amount;
 
+    @Column(name = "original_amount")
+    private BigDecimal originalAmount;
+
+    @Builder.Default
+    @Column(name = "loyalty_points_used", nullable = false)
+    private Integer loyaltyPointsUsed = 0;
+
+    @Builder.Default
+    @Column(name = "loyalty_discount", nullable = false)
+    private BigDecimal loyaltyDiscount = BigDecimal.ZERO;
+
+    @Column(name = "recorded_by")
+    private UUID recordedBy;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentMethod method;

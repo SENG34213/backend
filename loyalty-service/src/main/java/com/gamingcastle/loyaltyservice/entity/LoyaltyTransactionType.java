@@ -2,5 +2,9 @@ package com.gamingcastle.loyaltyservice.entity;
 
 public enum LoyaltyTransactionType {
     EARNED,
-    REDEEMED
+    REDEEMED,
+    REDEMPTION_RELEASED,
+    EARN_REVERSED,
+    REDEEM_RESTORED,
+    ADJUSTED
 }

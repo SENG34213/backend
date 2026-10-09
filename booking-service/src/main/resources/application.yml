@@ -37,3 +37,7 @@ gateway:
 services:
   payment:
     base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+
+
+loyalty:
+  base-url: ${LOYALTY_BASE_URL:http://localhost:8085}
