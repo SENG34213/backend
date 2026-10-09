@@ -25,3 +25,9 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}
+
+loyalty:
+  base-url: ${LOYALTY_BASE_URL:http://localhost:8085}

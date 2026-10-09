@@ -32,3 +32,6 @@ jwt:
 
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
+
+loyalty:
+  base-url: ${LOYALTY_BASE_URL:http://localhost:8085}
