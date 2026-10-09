@@ -47,7 +47,7 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository,paymentClient,notificationClient,loyaltyClient,userClient);
+        bookingService = new BookingServiceImpl(bookingRepository, gameStationRepository,loyaltyClient,paymentClient,notificationClient,userClient);
 
         station = GameStation.builder()
                 .id(UUID.randomUUID())
