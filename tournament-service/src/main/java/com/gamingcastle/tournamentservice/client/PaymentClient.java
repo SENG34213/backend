@@ -55,7 +55,7 @@ public class PaymentClient {
                 "TOURNAMENT_ENTRY",
                 registrationId,
                 amount,
-                "CARD",
+                "ONLINE",
                 idempotencyKey
         );
 

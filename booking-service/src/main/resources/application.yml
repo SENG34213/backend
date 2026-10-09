@@ -36,4 +36,4 @@ gateway:
 # Base URL for inter-service HTTP calls (override via env var for Docker/cloud)
 services:
   payment:
-    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
