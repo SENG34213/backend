@@ -33,5 +33,11 @@ jwt:
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
 
+# Base URL for inter-service HTTP calls (override via env var for Docker/cloud)
+services:
+  payment:
+    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+
+
 loyalty:
   base-url: ${LOYALTY_BASE_URL:http://localhost:8085}

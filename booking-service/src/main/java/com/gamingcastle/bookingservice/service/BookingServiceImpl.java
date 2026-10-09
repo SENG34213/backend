@@ -10,13 +10,20 @@ import com.gamingcastle.bookingservice.entity.GameStation;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
+import com.gamingcastle.bookingservice.client.NotificationClient;
+import com.gamingcastle.bookingservice.client.PaymentClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,12 +37,21 @@ public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
     private final LoyaltyClient loyaltyClient;
+    private final PaymentClient paymentClient;
+    private final NotificationClient notificationClient;
 
+    public BookingServiceImpl(
+            BookingRepository bookingRepository,
+            GameStationRepository gameStationRepository,
+            PaymentClient paymentClient,
+            NotificationClient notificationClient) {
     public BookingServiceImpl(BookingRepository bookingRepository, GameStationRepository gameStationRepository,
                               LoyaltyClient loyaltyClient) {
         this.bookingRepository = bookingRepository;
         this.gameStationRepository = gameStationRepository;
         this.loyaltyClient = loyaltyClient;
+        this.paymentClient = paymentClient;
+        this.notificationClient = notificationClient;
     }
 
     @Override
@@ -75,7 +91,59 @@ public class BookingServiceImpl implements BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
+
+        // FR-14: Charge booking fee = station.hourlyRate × duration in hours
+        // On payment failure → booking is set to CANCELLED (no orphaned PENDING records).
+        // Walk-in (cash) bookings skip card payment — admin handles cash directly.
+        if (source == BookingSource.ONLINE) {
+            long minutes = Duration.between(request.startTime(), request.endTime()).toMinutes();
+            BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
+            BigDecimal amount = station.getHourlyRate().multiply(hours).setScale(2, RoundingMode.HALF_UP);
+
+            UUID paymentId;
+            try {
+                paymentId = paymentClient.chargeBookingFee(amount, userId, booking.getId(), "CARD");
+            } catch (BookingException e) {
+                booking.setStatus(BookingStatus.CANCELLED);
+                bookingRepository.save(booking);
+                throw e;
+            }
+
+            // Payment succeeded — confirm immediately
+            booking.setPaymentId(paymentId);
+            booking.setStatus(BookingStatus.CONFIRMED);
+            booking = bookingRepository.save(booking);
+
+            // Send confirmation email after successful payment
+            sendBookingConfirmedEmail(booking, amount);
+        } else {
+            // WALK_IN: admin records cash manually via POST /api/payments/cash later
+            // Booking remains PENDING until admin calls PATCH /{id}/confirm with paymentId
+            booking = bookingRepository.save(booking);
+        }
+
         return BookingResponse.from(booking);
+    }
+
+    /** Builds and dispatches the booking-confirmed email. */
+    private void sendBookingConfirmedEmail(Booking booking, BigDecimal amount) {
+        // Non-critical — failure is logged but does not roll back the booking
+        try {
+            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
+            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+            notificationClient.sendBookingConfirmation(new NotificationClient.BookingEmailRequest(
+                    null,   // email resolved by NotificationClient or populated via header in controller
+                    null,
+                    booking.getId().toString(),
+                    booking.getStation().getStationCode(),
+                    dateFmt.format(booking.getStartTime()),
+                    timeFmt.format(booking.getStartTime()),
+                    "LKR " + amount.toPlainString()
+            ));
+        } catch (Exception e) {
+            // notification failure must NOT roll back the payment
+            System.err.println("[BookingService] Confirmation email failed for bookingId=" + booking.getId() + ": " + e.getMessage());
+        }
     }
 
     @Override
@@ -188,8 +256,10 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setPaymentId(paymentId);
         booking.setStatus(BookingStatus.CONFIRMED);
-
         booking = bookingRepository.save(booking);
+
+        // Send confirmation email once WALK_IN booking is confirmed via admin cash payment
+        sendBookingConfirmedEmail(booking, BigDecimal.ZERO);
 
         return BookingResponse.from(booking);
     }
