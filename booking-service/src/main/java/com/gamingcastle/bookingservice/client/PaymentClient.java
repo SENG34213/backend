@@ -40,30 +40,42 @@ public class PaymentClient {
     }
 
     /**
+     * Result of a booking fee payment charge.
+     */
+    public record PaymentResult(
+            UUID paymentId,
+            BigDecimal totalAmount,
+            BigDecimal discountAmount,
+            BigDecimal payableAmount
+    ) {}
+
+    /**
      * Charges the booking fee for a given user and booking.
      *
-     * @param amount    the booking fee
-     * @param userId    the customer's UUID
-     * @param bookingId the booking UUID (used as referenceId and idempotency key seed)
-     * @param method    payment method — "CARD" or "CASH"
-     * @return the UUID of the successfully created payment record
+     * @param amount         the total booking fee before loyalty discount
+     * @param userId         the customer's UUID
+     * @param bookingId      the booking UUID (used as referenceId and idempotency key seed)
+     * @param method         payment method — e.g. "CARD", "ONLINE", "CASH"
+     * @param pointsToRedeem optional loyalty points to redeem
+     * @return PaymentResult containing paymentId and price breakdown
      * @throws BookingException (HTTP 402) if payment fails or service is unreachable
      */
-    public UUID chargeBookingFee(BigDecimal amount, UUID userId, UUID bookingId, String method) {
+    public PaymentResult chargeBookingFee(BigDecimal amount, UUID userId, UUID bookingId, String method, Integer pointsToRedeem) {
         String idempotencyKey = userId.toString() + "-" + bookingId.toString();
+        String selectedMethod = (method != null && !method.isBlank()) ? method.toUpperCase() : "CARD";
 
         PaymentRequest request = new PaymentRequest(
                 "BOOKING",
                 bookingId,
                 amount,
-                method,
-                idempotencyKey
+                selectedMethod,
+                idempotencyKey,
+                pointsToRedeem,
+                userId
         );
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-User-Id", userId.toString());
-        headers.set("X-User-Role", "CUSTOMER");
         if (gatewaySecret != null && !gatewaySecret.isBlank()) {
             headers.set("X-Gateway-Secret", gatewaySecret);
         }
@@ -72,7 +84,7 @@ public class PaymentClient {
 
         try {
             ResponseEntity<PaymentResponse> response = restTemplate.postForEntity(
-                    paymentBaseUrl + "/api/payments",
+                    paymentBaseUrl + "/api/internal/payments",
                     entity,
                     PaymentResponse.class
             );
@@ -88,8 +100,14 @@ public class PaymentClient {
                         "Booking payment failed (status=" + body.status() + ") for bookingId: " + bookingId);
             }
 
-            log.info("Booking payment SUCCESS: userId={} bookingId={} paymentId={}", userId, bookingId, body.id());
-            return body.id();
+            BigDecimal total = body.originalAmount() != null ? body.originalAmount() : amount;
+            BigDecimal discount = body.loyaltyDiscount() != null ? body.loyaltyDiscount() : BigDecimal.ZERO;
+            BigDecimal payable = body.amount() != null ? body.amount() : amount;
+
+            log.info("Booking payment SUCCESS: userId={} bookingId={} paymentId={} payableAmount={}",
+                    userId, bookingId, body.id(), payable);
+
+            return new PaymentResult(body.id(), total, discount, payable);
 
         } catch (BookingException e) {
             throw e;
@@ -113,13 +131,18 @@ public class PaymentClient {
             UUID referenceId,
             BigDecimal amount,
             String method,
-            String idempotencyKey
+            String idempotencyKey,
+            Integer loyaltyPointsToRedeem,
+            UUID customerUserId
     ) {}
 
     /** Mirrors PaymentResponse in payment-service (only fields we need). */
     record PaymentResponse(
             UUID id,
             String status,
-            String receiptNumber
+            String receiptNumber,
+            BigDecimal amount,
+            BigDecimal originalAmount,
+            BigDecimal loyaltyDiscount
     ) {}
 }

@@ -15,5 +15,11 @@ import java.util.UUID;
 public record BookingRequest(
         @NotNull UUID stationId,
         @NotNull @Future Instant startTime,
-        @NotNull @Future Instant endTime
-) {}
+        @NotNull @Future Instant endTime,
+        String paymentMethod,
+        Integer loyaltyPointsToRedeem
+) {
+    public BookingRequest(UUID stationId, Instant startTime, Instant endTime) {
+        this(stationId, startTime, endTime, null, null);
+    }
+}

@@ -13,6 +13,9 @@ import com.gamingcastle.bookingservice.repository.GameStationRepository;
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
 import com.gamingcastle.bookingservice.client.UserClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +38,17 @@ import org.springframework.data.domain.Pageable;
 @Service
 public class BookingServiceImpl implements BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
+
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
     private final LoyaltyClient loyaltyClient;
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
     private final UserClient userClient;
+
+    @Value("${booking.cancel-window-hours:2}")
+    private int cancelWindowHours = 2;
 
     public BookingServiceImpl(
             BookingRepository bookingRepository,
@@ -95,17 +103,26 @@ public class BookingServiceImpl implements BookingService {
 
         booking = bookingRepository.save(booking);
 
+        long minutes = Duration.between(request.startTime(), request.endTime()).toMinutes();
+        BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = station.getHourlyRate().multiply(hours).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal payableAmount = totalAmount;
+
         // FR-14: Charge booking fee = station.hourlyRate × duration in hours
         // On payment failure → booking is set to CANCELLED (no orphaned PENDING records).
         // Walk-in (cash) bookings skip card payment — admin handles cash directly.
         if (source == BookingSource.ONLINE) {
-            long minutes = Duration.between(request.startTime(), request.endTime()).toMinutes();
-            BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
-            BigDecimal amount = station.getHourlyRate().multiply(hours).setScale(2, RoundingMode.HALF_UP);
-
-            UUID paymentId;
+            PaymentClient.PaymentResult paymentResult;
             try {
-                paymentId = paymentClient.chargeBookingFee(amount, userId, booking.getId(), "ONLINE");
+                paymentResult = paymentClient.chargeBookingFee(
+                        totalAmount,
+                        userId,
+                        booking.getId(),
+                        request.paymentMethod(),
+                        request.loyaltyPointsToRedeem()
+                );
             } catch (BookingException e) {
                 booking.setStatus(BookingStatus.CANCELLED);
                 bookingRepository.save(booking);
@@ -113,19 +130,22 @@ public class BookingServiceImpl implements BookingService {
             }
 
             // Payment succeeded — confirm immediately
-            booking.setPaymentId(paymentId);
+            booking.setPaymentId(paymentResult.paymentId());
             booking.setStatus(BookingStatus.CONFIRMED);
             booking = bookingRepository.save(booking);
 
+            discountAmount = paymentResult.discountAmount();
+            payableAmount = paymentResult.payableAmount();
+
             // Send confirmation email after successful payment
-            sendBookingConfirmedEmail(booking, amount);
+            sendBookingConfirmedEmail(booking, payableAmount);
         } else {
             // WALK_IN: admin records cash manually via POST /api/payments/cash later
             // Booking remains PENDING until admin calls PATCH /{id}/confirm with paymentId
             booking = bookingRepository.save(booking);
         }
 
-        return BookingResponse.from(booking);
+        return BookingResponse.from(booking, totalAmount, discountAmount, payableAmount);
     }
 
     /** Builds and dispatches the booking-confirmed email. */
@@ -144,7 +164,7 @@ public class BookingServiceImpl implements BookingService {
             }
 
             if (email == null || email.isBlank()) {
-                System.err.println("[BookingService] Skipping booking confirmation email for bookingId=" + booking.getId() + ": no user email found");
+                log.warn("Skipping booking confirmation email for bookingId={}: no user email found", booking.getId());
                 return;
             }
 
@@ -159,7 +179,7 @@ public class BookingServiceImpl implements BookingService {
             ));
         } catch (Exception e) {
             // notification failure must NOT roll back the payment
-            System.err.println("[BookingService] Confirmation email failed for bookingId=" + booking.getId() + ": " + e.getMessage());
+            log.error("Confirmation email failed for bookingId={}: {}", booking.getId(), e.getMessage());
         }
     }
 
@@ -187,9 +207,9 @@ public class BookingServiceImpl implements BookingService {
                     "This booking is already cancelled");
         }
 
-        if (Instant.now().plus(2, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
+        if (Instant.now().plus(cancelWindowHours, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
             throw new BookingException(HttpStatus.BAD_REQUEST, "TOO_LATE",
-                    "cannot rechedule or cancel because 2 hours here");
+                    "Bookings cannot be cancelled within " + cancelWindowHours + " hours of the scheduled start time");
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
@@ -215,9 +235,9 @@ public class BookingServiceImpl implements BookingService {
                     "Only CONFIRMED bookings can be rescheduled");
         }
 
-        if (Instant.now().plus(2, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
+        if (Instant.now().plus(cancelWindowHours, ChronoUnit.HOURS).isAfter(booking.getStartTime())) {
             throw new BookingException(HttpStatus.BAD_REQUEST, "TOO_LATE",
-                    "cannot rechedule or cancel because 2 hours here");
+                    "Bookings cannot be rescheduled within " + cancelWindowHours + " hours of the scheduled start time");
         }
 
         if (!request.endTime().isAfter(request.startTime())) {
