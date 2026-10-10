@@ -137,7 +137,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
                                                              HttpServletRequest request) {
-        log.warn("Data integrity issue at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Data integrity issue at {}: {}", request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage(), ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ErrorResponse.of(ErrorCodes.DATA_INTEGRITY_VIOLATION, "A data integrity constraint was violated",
                         HttpStatus.CONFLICT, request.getRequestURI()));
