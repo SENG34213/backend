@@ -96,7 +96,7 @@ public class BookingController {
             @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
         boolean isAdmin = "ADMIN".equals(role);
         BookingResponse response = bookingService.cancelBooking(bookingId, userId, isAdmin);
-        
+
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
                 .withZone(java.time.ZoneId.systemDefault())
@@ -104,12 +104,12 @@ public class BookingController {
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
                 .withZone(java.time.ZoneId.systemDefault())
                 .format(response.startTime());
-            
+
             notificationClient.sendBookingCancelled(new NotificationClient.BookingEmailRequest(
-                email, fullName, response.id().toString(), response.stationCode(), 
+                email, fullName, response.id().toString(), response.stationCode(),
                 dateStr, timeSlot, "LKR. 1,000.00"));
         }
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -125,7 +125,7 @@ public class BookingController {
             @RequestHeader(value = "X-User-FullName", required = false) String fullName) {
         boolean isAdmin = "ADMIN".equals(role);
         BookingResponse response = bookingService.rescheduleBooking(bookingId, userId, isAdmin, request);
-        
+
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
                 .withZone(java.time.ZoneId.systemDefault())
@@ -133,19 +133,19 @@ public class BookingController {
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
                 .withZone(java.time.ZoneId.systemDefault())
                 .format(response.startTime());
-            
+
             notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
-                email, fullName, response.id().toString(), response.stationCode(), 
+                email, fullName, response.id().toString(), response.stationCode(),
                 dateStr, timeSlot, "LKR. 1,000.00"));
         }
-        
+
         return ResponseEntity.ok(response);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/confirm")
     public ResponseEntity<BookingResponse> confirmBooking(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ConfirmBookingRequest request
     ) {
         BookingResponse response = bookingService.confirmBooking(
