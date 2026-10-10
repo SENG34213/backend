@@ -86,6 +86,35 @@ mvn spring-boot:run
 
 Set the same `GATEWAY_INTERNAL_SECRET` and `LOYALTY_BASE_URL` when running `payment-service`; both booking and payment call loyalty directly for booking cancellation and payment redemption/earning. `LOYALTY_BASE_URL` should be the service origin (for example, `http://localhost:8085`), not the `/api` path. The same database-variable pattern applies to `tournament-service`, `loyalty-service` and `notification-service`.
 
+### Notification service calls
+
+Notification endpoints are internal APIs and are intentionally not routed through the public API gateway. The endpoint paths are rooted at `http://localhost:8086/api/notifications` for local development; for example, the welcome endpoint is `POST http://localhost:8086/api/notifications/welcome`. Calls require JSON plus `X-Gateway-Secret`, `X-User-Id`, and `X-User-Role: SERVICE` headers. Do not expose or call these endpoints through the public gateway.
+
+`user-service`, `booking-service`, and `tournament-service` call notification-service directly. They share `GATEWAY_INTERNAL_SECRET` with notification-service and accept `NOTIFICATION_SERVICE_URL` as the notification service origin. Use `http://localhost:8086` when running services directly on the host, or the notification service's internal DNS name and port (for example, `http://notification-service:8086`) when running in Docker. The notification service must be running and configured with valid mail/SMS provider settings for messages to be delivered.
+
+When running services directly from PowerShell, set these variables in each service terminal before starting it (use the same secret value for notification-service and each calling service):
+
+```powershell
+$env:GATEWAY_INTERNAL_SECRET = '<your-local-shared-secret>'
+$env:NOTIFICATION_SERVICE_URL = 'http://localhost:8086'
+```
+
+To test the protected welcome endpoint directly from PowerShell, first set `$env:GATEWAY_INTERNAL_SECRET` to the same local secret used by all services, then run:
+
+```powershell
+$headers = @{
+    'X-Gateway-Secret' = $env:GATEWAY_INTERNAL_SECRET
+    'X-User-Id' = '00000000-0000-0000-0000-000000000001'
+    'X-User-Role' = 'SERVICE'
+}
+$body = @{ email = 'your-address@example.com'; fullName = 'Test User' } | ConvertTo-Json
+Invoke-RestMethod -Method Post `
+    -Uri 'http://localhost:8086/api/notifications/welcome' `
+    -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+The endpoint responds successfully after handling the request, but email-provider failures are recorded rather than returned as HTTP errors. Verify actual delivery in the notification-service logs and the notification database (`SELECT notification_type, recipient_email, status, error_message, created_at, sent_at FROM notifications ORDER BY created_at DESC LIMIT 10;`). To test the full registration flow instead, register through `POST http://localhost:8080/api/auth/register`; user-service invokes the protected internal welcome endpoint. A direct call through `http://localhost:8080/api/notifications/welcome` should remain unavailable.
+
 ## Main API entry points
 
 The default public routes are exposed through the gateway:

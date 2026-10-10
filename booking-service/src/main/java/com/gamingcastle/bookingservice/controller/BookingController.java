@@ -59,7 +59,7 @@ public class BookingController {
     @PostMapping("/walk-in")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookingResponse> createWalkInBooking(
-            @RequestBody WalkInBookingRequest request,
+            @Valid @RequestBody WalkInBookingRequest request,
             @RequestHeader("X-User-Id") UUID callerId,
             @RequestHeader("X-User-Role") String callerRole) {
 

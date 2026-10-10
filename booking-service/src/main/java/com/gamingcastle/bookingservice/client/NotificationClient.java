@@ -1,44 +1,65 @@
 package com.gamingcastle.bookingservice.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 @Service
 public class NotificationClient {
 
+    private static final Logger log = LoggerFactory.getLogger(NotificationClient.class);
+    private static final String SERVICE_USER_ID = "00000000-0000-0000-0000-000000000002";
     private final RestTemplate restTemplate;
+
+    @Value("${services.notification.base-url:http://localhost:8086}")
+    private String notificationBaseUrl;
+
+    @Value("${gateway.internal-secret}")
+    private String gatewaySecret;
 
     public NotificationClient() {
         this.restTemplate = new RestTemplate();
     }
 
-    // A simpler way without needing full eureka load balancing for direct call, 
-    // but ideally we'd use @LoadBalanced RestTemplate. For now, since gateway is on 8080 
-    // or notification is on 8086 locally, we'll hardcode localhost:8086 for the example.
-    private final String BASE_URL = "http://localhost:8086/api/notifications";
-
     public void sendBookingConfirmation(BookingEmailRequest request) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/booking-confirmed", request, Void.class);
+            send("/booking-confirmed", request);
         } catch (Exception e) {
-            System.err.println("Failed to send booking confirmation email: " + e.getMessage());
+            log.error("Failed to send booking confirmation email for bookingId={}", request.bookingId(), e);
         }
     }
 
     public void sendBookingRescheduled(BookingEmailRequest request) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/booking-rescheduled", request, Void.class);
+            send("/booking-rescheduled", request);
         } catch (Exception e) {
-            System.err.println("Failed to send booking rescheduled email: " + e.getMessage());
+            log.error("Failed to send booking rescheduled email for bookingId={}", request.bookingId(), e);
         }
     }
 
     public void sendBookingCancelled(BookingEmailRequest request) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/booking-cancelled", request, Void.class);
+            send("/booking-cancelled", request);
         } catch (Exception e) {
-            System.err.println("Failed to send booking cancelled email: " + e.getMessage());
+            log.error("Failed to send booking cancelled email for bookingId={}", request.bookingId(), e);
         }
+    }
+
+    private void send(String path, BookingEmailRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Gateway-Secret", gatewaySecret);
+        headers.set("X-User-Id", SERVICE_USER_ID);
+        headers.set("X-User-Role", "SERVICE");
+        restTemplate.postForEntity(
+                notificationBaseUrl + "/api/notifications" + path,
+                new HttpEntity<>(request, headers),
+                Void.class);
     }
 
     public record BookingEmailRequest(
