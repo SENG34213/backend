@@ -129,6 +129,14 @@ public class BookingServiceImpl implements BookingService {
                 throw e;
             }
 
+            // ADD THIS NULL CHECK
+            if (paymentResult == null) {
+                booking.setStatus(BookingStatus.CANCELLED);
+                bookingRepository.save(booking);
+                throw new BookingException(HttpStatus.BAD_REQUEST, "PAYMENT_FAILED",
+                        "Payment processing returned no result");
+            }
+
             // Payment succeeded — confirm immediately
             booking.setPaymentId(paymentResult.paymentId());
             booking.setStatus(BookingStatus.CONFIRMED);
