@@ -31,10 +31,6 @@ spring:
           uri: lb://loyalty-service
           predicates:
             - Path=/api/loyalty/**
-        - id: notification-service
-          uri: lb://notification-service
-          predicates:
-            - Path=/api/notifications/**
 
 eureka:
   client:

@@ -3,6 +3,7 @@ package com.gamingcastle.notificationservice.controller;
 import com.gamingcastle.notificationservice.dto.*;
 import com.gamingcastle.notificationservice.service.NotificationService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/notifications")
+@PreAuthorize("hasRole('SERVICE')")
 public class NotificationController {
 
     private final NotificationService notificationService;
