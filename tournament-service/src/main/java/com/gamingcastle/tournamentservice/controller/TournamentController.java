@@ -44,6 +44,7 @@ public class TournamentController {
     }
 
     /** FR-13: Admin creates and publishes a tournament. */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<TournamentResponse> createTournament(
             @Valid @RequestBody TournamentRequest request,
@@ -66,6 +67,7 @@ public class TournamentController {
     }
 
     /** FR-17: Admin updates tournament status (UPCOMING, ONGOING, COMPLETED). */
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<TournamentResponse> updateTournamentStatus(
             @PathVariable UUID id,
