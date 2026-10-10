@@ -52,6 +52,14 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Guest browsing of tournaments
+        if ("GET".equalsIgnoreCase(request.getMethod()) && path.startsWith("/api/tournaments")) {
+            if (userIdHeader == null || userIdHeader.isBlank()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+        }
+
         if (userIdHeader == null || roleHeader == null || userIdHeader.isBlank() || roleHeader.isBlank()) {
             unauthorized(response, "Missing or invalid gateway identity headers");
             return;
