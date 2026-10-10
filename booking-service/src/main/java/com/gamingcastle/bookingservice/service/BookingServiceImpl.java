@@ -256,6 +256,14 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse confirmBooking(UUID bookingId, UUID paymentId) {
+        if (paymentId == null) {
+            throw new BookingException(
+                    HttpStatus.BAD_REQUEST,
+                    "PAYMENT_ID_REQUIRED",
+                    "paymentId is required to confirm a booking"
+            );
+        }
+
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException(
                         HttpStatus.NOT_FOUND,

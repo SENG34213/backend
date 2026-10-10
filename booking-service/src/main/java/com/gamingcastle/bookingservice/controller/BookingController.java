@@ -78,6 +78,7 @@ public class BookingController {
     }
 
     /** FR-10: the caller's own booking history — never another user's. */
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @GetMapping("/mine")
     public ResponseEntity<List<BookingResponse>> getMyBookings(
             @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId) {
@@ -141,6 +142,7 @@ public class BookingController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/confirm")
     public ResponseEntity<BookingResponse> confirmBooking(
             @PathVariable UUID id,

@@ -187,4 +187,26 @@ class BookingServiceTest {
         assertThat(response.status()).isEqualTo(BookingStatus.CANCELLED);
         verify(loyaltyClient).reverse(bookingId, "Booking cancelled");
     }
+
+    @Test
+    void confirmBooking_shouldRejectNullPaymentId() {
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.PENDING)
+                .source(BookingSource.WALK_IN)
+                .build();
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.confirmBooking(bookingId, null))
+                .isInstanceOf(BookingException.class)
+                .hasMessageContaining("paymentId is required");
+
+        verify(bookingRepository, never()).save(any());
+    }
 }
