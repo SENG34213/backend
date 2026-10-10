@@ -11,8 +11,8 @@ public final class APIEndPoints {
     public static final String internalPathPrefix = internalAPI + "/";
 
     public static final String loyalty = "/loyalty";
-    public static final String adminLoyalty = "/admin/loyalty";
-    public static final String internalLoyalty = "/internal/loyalty";
+    public static final String adminLoyalty = "loyalty/admin";
+    public static final String internalLoyalty = "loyalty/internal";
 
     public static final String userIdPath = "/{userId}";
 
