@@ -56,6 +56,20 @@ public class GameStationController {
         return ResponseEntity.ok(station);
     }
 
+    /** G1: Get time slot availability for a game station on a given date. */
+    @GetMapping("/{id}/availability")
+    public ResponseEntity<List<com.gamingcastle.bookingservice.dto.SlotAvailabilityResponse>> getStationAvailability(
+            @PathVariable UUID id,
+            @RequestParam("date") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date) {
+
+        log.info("Fetching slot availability for station ID: {} on date: {}", id, date);
+
+        List<com.gamingcastle.bookingservice.dto.SlotAvailabilityResponse> availability =
+                gameStationService.getStationAvailability(id, date);
+
+        return ResponseEntity.ok(availability);
+    }
+
     /** Create a new game station — ADMIN only. */
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping

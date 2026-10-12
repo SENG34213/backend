@@ -1,6 +1,10 @@
 package com.gamingcastle.userservice.client;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +13,14 @@ import org.slf4j.LoggerFactory;
 public class NotificationClient {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationClient.class);
+    private static final String SERVICE_USER_ID = "00000000-0000-0000-0000-000000000001";
     private final RestTemplate restTemplate;
-    private final String BASE_URL = "http://localhost:8086/api/notifications";
+
+    @Value("${services.notification.base-url:http://localhost:8086}")
+    private String notificationBaseUrl;
+
+    @Value("${gateway.internal-secret}")
+    private String gatewaySecret;
 
     public NotificationClient() {
         this.restTemplate = new RestTemplate();
@@ -18,7 +28,7 @@ public class NotificationClient {
 
     public void sendWelcomeEmail(String email, String fullName) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/welcome", new WelcomeEmailRequest(email, fullName), Void.class);
+            send("/welcome", new WelcomeEmailRequest(email, fullName));
         } catch (Exception e) {
             log.error("Failed to send welcome email via notification-service", e);
         }
@@ -26,7 +36,7 @@ public class NotificationClient {
 
     public void sendPasswordResetEmail(String email, String code) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/password-reset", new PasswordResetEmailRequest(email, code), Void.class);
+            send("/password-reset", new PasswordResetEmailRequest(email, code));
         } catch (Exception e) {
             log.error("Failed to send password reset email via notification-service", e);
         }
@@ -34,7 +44,7 @@ public class NotificationClient {
 
     public void sendPasswordResetSms(String phoneNumber, String code) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/password-reset-sms", new PasswordResetSmsRequest(phoneNumber, code), Void.class);
+            send("/password-reset-sms", new PasswordResetSmsRequest(phoneNumber, code));
         } catch (Exception e) {
             log.error("Failed to send password reset sms via notification-service", e);
         }
@@ -42,7 +52,7 @@ public class NotificationClient {
 
     public void sendAccountReactivationEmail(String email, String code) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/account-reactivation", new AccountReactivationEmailRequest(email, code), Void.class);
+            send("/account-reactivation", new AccountReactivationEmailRequest(email, code));
         } catch (Exception e) {
             log.error("Failed to send account reactivation email via notification-service", e);
         }
@@ -50,10 +60,22 @@ public class NotificationClient {
 
     public void sendAccountReactivationSms(String phoneNumber, String code) {
         try {
-            restTemplate.postForEntity(BASE_URL + "/account-reactivation-sms", new AccountReactivationSmsRequest(phoneNumber, code), Void.class);
+            send("/account-reactivation-sms", new AccountReactivationSmsRequest(phoneNumber, code));
         } catch (Exception e) {
             log.error("Failed to send account reactivation sms via notification-service", e);
         }
+    }
+
+    private void send(String path, Object request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Gateway-Secret", gatewaySecret);
+        headers.set("X-User-Id", SERVICE_USER_ID);
+        headers.set("X-User-Role", "SERVICE");
+        restTemplate.postForEntity(
+                notificationBaseUrl + "/api/notifications" + path,
+                new HttpEntity<>(request, headers),
+                Void.class);
     }
 
     public record WelcomeEmailRequest(String email, String fullName) {}

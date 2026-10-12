@@ -37,6 +37,8 @@ gateway:
 services:
   payment:
     base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
 
 
 loyalty:

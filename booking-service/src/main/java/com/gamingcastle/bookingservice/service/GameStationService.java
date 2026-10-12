@@ -2,6 +2,8 @@ package com.gamingcastle.bookingservice.service;
 
 import com.gamingcastle.bookingservice.dto.GameStationRequest;
 import com.gamingcastle.bookingservice.dto.GameStationResponse;
+import com.gamingcastle.bookingservice.dto.SlotAvailabilityResponse;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,4 +13,5 @@ public interface GameStationService {
     void deleteStation(UUID id);
     List<GameStationResponse> getAllStations();
     GameStationResponse getStationById(UUID id);
+    List<SlotAvailabilityResponse> getStationAvailability(UUID id, LocalDate date);
 }

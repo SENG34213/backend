@@ -14,6 +14,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import java.util.UUID;
 
 // existing imports...
 
@@ -98,5 +101,13 @@ public class GlobalExceptionHandler {
                         "BAD_REQUEST",
                         "Missing required header: " + ex.getHeaderName()
                 ));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<String> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        if (ex.getRequiredType() == UUID.class) {
+            return ResponseEntity.badRequest().body("Invalid UUID format");
+        }
+        return ResponseEntity.badRequest().body("Invalid argument");
     }
 }

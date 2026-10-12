@@ -53,6 +53,21 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (path.startsWith("/api/internal")) {
+            Authentication authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            "SERVICE",
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_SERVICE")));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            try {
+                filterChain.doFilter(request, response);
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
+            return;
+        }
+
         if (userIdHeader == null || roleHeader == null
                 || userIdHeader.isBlank() || roleHeader.isBlank()) {
             unauthorized(response, "Missing or invalid gateway identity headers");

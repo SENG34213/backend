@@ -17,11 +17,14 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Runs against the real Gateway-header-trust model: no JWT is involved here
@@ -61,8 +64,24 @@ class BookingControllerIntegrationTest {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "Seed station PC-01 not found - check V1__create_booking_tables.sql ran against the test DB"));
+
         customerId = UUID.randomUUID();
         adminId = UUID.randomUUID();
+
+        // Mock PaymentClient.chargeBookingFee() to return a successful payment result
+        // This allows all online booking tests to succeed instead of failing with 400 BAD_REQUEST
+        when(paymentClient.chargeBookingFee(
+                any(BigDecimal.class),
+                any(UUID.class),
+                any(UUID.class),
+                any(String.class),
+                any(Integer.class)))
+                .thenReturn(new PaymentClient.PaymentResult(
+                        UUID.randomUUID(),
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("100.00")
+                ));
     }
 
     private HttpHeaders headersFor(UUID userId, String role) {
