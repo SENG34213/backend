@@ -11,6 +11,7 @@ import com.gamingcastle.userservice.exception.AccountDeactivatedByAdminException
 import com.gamingcastle.userservice.exception.AccountDeactivatedException;
 import com.gamingcastle.userservice.exception.AccountLockedException;
 import com.gamingcastle.userservice.exception.InvalidCredentialsException;
+import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.service.impl.AuthServiceImpl;
 import com.gamingcastle.userservice.util.JwtUtil;
@@ -306,5 +307,72 @@ class AuthServiceTest {
                 .isInstanceOf(AccountLockedException.class); // CHANGED: was InvalidCredentialsException
         assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
         assertThat(user.isLocked()).isTrue();
+    }
+
+    @Test
+    void register_shouldThrowConflict_givenPhoneAlreadyExists() {
+        // Arrange
+        RegisterRequest request = new RegisterRequest("newplayer@example.com", "password123", "New Player", "0771234567");
+        when(userRepository.existsByEmail("newplayer@example.com")).thenReturn(false);
+        when(userRepository.existsByPhoneNumber("0771234567")).thenReturn(true);
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(PhoneAlreadyExistsException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void register_shouldSucceedWithNotificationSentFalse_whenNotificationServiceFails() {
+        // Arrange
+        RegisterRequest request = new RegisterRequest("player@example.com", "password123", "Test Player", "0771234567");
+        when(userRepository.existsByEmail(any())).thenReturn(false);
+        when(userRepository.existsByPhoneNumber(any())).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("hashed-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(UUID.randomUUID());
+            return u;
+        });
+        when(jwtUtil.generateToken(any(User.class))).thenReturn("mock-jwt-token");
+        doThrow(new RuntimeException("Notification service unreachable"))
+                .when(notificationClient).sendWelcomeEmail(any(), any());
+
+        // Act
+        AuthResponse response = authService.register(request);
+
+        // Assert
+        assertThat(response.accessToken()).isEqualTo("mock-jwt-token");
+        assertThat(response.notificationSent()).isFalse();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void login_shouldRejectInvalidCredentials_givenUnknownEmail() {
+        // Arrange
+        LoginRequest request = new LoginRequest("unknown@example.com", "password123");
+        when(userRepository.findByEmailForUpdate("unknown@example.com")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(InvalidCredentialsException.class);
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void loginByPhone_shouldStartCountingFromOne_whenPreviousLockHasExpired() {
+        // Arrange
+        User user = User.builder().id(UUID.randomUUID()).email("player@example.com")
+                .phoneNumber("0771234567").passwordHash("hashed-password").role(Role.CUSTOMER)
+                .failedLoginAttempts(5).lockedUntil(Instant.now().minusSeconds(60)).build();
+        PhoneLoginRequest request = new PhoneLoginRequest("0771234567", "wrong-password");
+        when(userRepository.findByPhoneNumberForUpdate("0771234567")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.password(), user.getPasswordHash())).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.loginByPhone(request))
+                .isInstanceOf(InvalidCredentialsException.class);
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(1);
+        assertThat(user.isLocked()).isFalse();
     }
 }
