@@ -195,6 +195,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentReceipt(
@@ -207,22 +208,28 @@ public class PaymentServiceImpl implements PaymentService {
                         "Payment not found: " + paymentId
                 ));
 
+        // Admins can access any payment receipt.
         if ("ADMIN".equals(role)) {
             return toResponse(payment);
         }
 
-        if ("CUSTOMER".equals(role)
-                && !payment.getUserId().equals(userId)) {
+        // Customers can access only their own payment receipts.
+        if ("CUSTOMER".equals(role)) {
+            if (!payment.getUserId().equals(userId)) {
+                throw new IllegalArgumentException(
+                        "You are not authorized to access this payment"
+                );
+            }
 
-            throw new IllegalArgumentException(
-                    "You are not authorized to access this payment"
-            );
+            // Important: return the receipt when the customer owns the payment.
+            return toResponse(payment);
         }
 
         throw new IllegalArgumentException(
                 "You are not authorized to access this payment"
         );
     }
+
 
     @Override
     @Transactional(readOnly = true)
