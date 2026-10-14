@@ -39,6 +39,7 @@ import org.springframework.data.domain.Pageable;
 public class BookingServiceImpl implements BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
+    private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
 
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
@@ -160,8 +161,8 @@ public class BookingServiceImpl implements BookingService {
     private void sendBookingConfirmedEmail(Booking booking, BigDecimal amount) {
         // Non-critical — failure is logged but does not roll back the booking
         try {
-            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
-            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(SRI_LANKA_ZONE);
+            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(SRI_LANKA_ZONE);
 
             String email = null;
             String fullName = null;

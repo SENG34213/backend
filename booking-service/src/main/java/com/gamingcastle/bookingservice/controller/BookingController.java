@@ -32,6 +32,8 @@ import java.util.UUID;
 @RequestMapping("/api/bookings")
 public class BookingController {
 
+    private static final java.time.ZoneId SRI_LANKA_ZONE = java.time.ZoneId.of("Asia/Colombo");
+
     private final BookingService bookingService;
     private final NotificationClient notificationClient;
 
@@ -99,10 +101,10 @@ public class BookingController {
 
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
 
             notificationClient.sendBookingCancelled(new NotificationClient.BookingEmailRequest(
@@ -128,10 +130,10 @@ public class BookingController {
 
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
 
             notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
