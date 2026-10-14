@@ -6,6 +6,7 @@ import com.gamingcastle.loyaltyservice.entity.LoyaltyTransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -36,4 +37,9 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
             LoyaltyTransactionStatus status,
             Instant cutoff
     );
+
+    @Query("select coalesce(sum(t.points), 0) from LoyaltyTransaction t where t.type = 'REDEEM' and t.status = 'COMPLETED'")
+    long sumRedeemedPoints();
+
+    Page<LoyaltyTransaction> findAll(Pageable pageable);
 }

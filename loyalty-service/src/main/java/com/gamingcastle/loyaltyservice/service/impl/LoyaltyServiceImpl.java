@@ -6,6 +6,7 @@ import com.gamingcastle.loyaltyservice.dto.request.CalculateRedemptionRequest;
 import com.gamingcastle.loyaltyservice.dto.request.RedeemPointsRequest;
 import com.gamingcastle.loyaltyservice.dto.request.UpdateLoyaltyRulesRequest;
 import com.gamingcastle.loyaltyservice.dto.response.AdminAdjustmentResponse;
+import com.gamingcastle.loyaltyservice.dto.response.AdminLoyaltyStatsResponse;
 import com.gamingcastle.loyaltyservice.dto.response.AwardPointsResponse;
 import com.gamingcastle.loyaltyservice.dto.response.CalculationResponse;
 import com.gamingcastle.loyaltyservice.dto.response.LoyaltyAccountResponse;
@@ -14,6 +15,8 @@ import com.gamingcastle.loyaltyservice.dto.response.LoyaltyStatusResponse;
 import com.gamingcastle.loyaltyservice.dto.response.RedemptionReservationResponse;
 import com.gamingcastle.loyaltyservice.dto.response.ReverseLoyaltyResponse;
 import com.gamingcastle.loyaltyservice.dto.response.TransactionHistoryResponse;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import com.gamingcastle.loyaltyservice.entity.LoyaltyAccount;
 import com.gamingcastle.loyaltyservice.entity.LoyaltyRules;
 import com.gamingcastle.loyaltyservice.entity.LoyaltyTier;
@@ -547,5 +550,56 @@ public class LoyaltyServiceImpl implements LoyaltyService {
                 rules.getGoldThreshold(),
                 rules.getGoldMultiplier(),
                 rules.getUpdatedBy());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminLoyaltyStatsResponse getLoyaltyStats() {
+        long totalAccounts = accountRepository.count();
+        long totalPointsInCirculation = accountRepository.sumPointsBalance();
+        long totalPointsAwardedAllTime = accountRepository.sumLifetimeEarned();
+        long totalPointsRedeemedAllTime = transactionRepository.sumRedeemedPoints();
+
+        Map<String, Long> accountsByTier = new LinkedHashMap<>();
+        for (LoyaltyTier tier : LoyaltyTier.values()) {
+            accountsByTier.put(tier.name(), accountRepository.countByTier(tier));
+        }
+
+        return new AdminLoyaltyStatsResponse(
+                totalAccounts,
+                totalPointsInCirculation,
+                totalPointsAwardedAllTime,
+                totalPointsRedeemedAllTime,
+                accountsByTier
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<LoyaltyAccountResponse> getAllAccounts(Pageable pageable) {
+        LoyaltyRules rules = getRulesOrThrow();
+        return accountRepository.findAll(pageable).map(acc -> new LoyaltyAccountResponse(
+                acc.getUserId(),
+                acc.getPointsBalance(),
+                acc.getLifetimeEarned(),
+                acc.getTier() != null ? acc.getTier().name() : LoyaltyTier.BRONZE.name(),
+                rules.getPointValueLkr(),
+                PointsCalculator.calculateDiscount(acc.getPointsBalance(), rules.getPointValueLkr())
+        ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<TransactionHistoryResponse> getAllTransactions(Pageable pageable) {
+        Sort newestFirst = Sort.by(Sort.Direction.DESC, "createdAt");
+        Pageable effective;
+        if (!pageable.isPaged()) {
+            effective = PageRequest.of(0, 20, newestFirst);
+        } else if (pageable.getSort().isUnsorted()) {
+            effective = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), newestFirst);
+        } else {
+            effective = pageable;
+        }
+        return transactionRepository.findAll(effective).map(this::toHistoryResponse);
     }
 }
