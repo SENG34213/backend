@@ -267,4 +267,19 @@ public class TournamentServiceImpl implements TournamentService {
         tournament.setReminderSent(true);
         tournamentRepository.save(tournament);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.gamingcastle.tournamentservice.dto.AdminTournamentStatsResponse getTournamentStats() {
+        long total = tournamentRepository.count();
+        long upcoming = tournamentRepository.countByStatus(TournamentStatus.UPCOMING);
+        long ongoing = tournamentRepository.countByStatus(TournamentStatus.ONGOING);
+        long completed = tournamentRepository.countByStatus(TournamentStatus.COMPLETED);
+        long cancelled = tournamentRepository.countByStatus(TournamentStatus.CANCELLED);
+        long participants = tournamentRepository.sumTotalParticipants();
+
+        return new com.gamingcastle.tournamentservice.dto.AdminTournamentStatsResponse(
+                total, upcoming, ongoing, completed, cancelled, participants
+        );
+    }
 }

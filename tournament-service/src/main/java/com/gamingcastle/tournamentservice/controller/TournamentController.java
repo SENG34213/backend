@@ -1,12 +1,6 @@
 package com.gamingcastle.tournamentservice.controller;
 
-import com.gamingcastle.tournamentservice.dto.BracketResponse;
-import com.gamingcastle.tournamentservice.dto.MatchResponse;
-import com.gamingcastle.tournamentservice.dto.MatchResultRequest;
-import com.gamingcastle.tournamentservice.dto.RegistrationResponse;
-import com.gamingcastle.tournamentservice.dto.TournamentRequest;
-import com.gamingcastle.tournamentservice.dto.TournamentResponse;
-import com.gamingcastle.tournamentservice.dto.TournamentStatusUpdateRequest;
+import com.gamingcastle.tournamentservice.dto.*;
 import com.gamingcastle.tournamentservice.service.BracketService;
 import com.gamingcastle.tournamentservice.service.RegistrationService;
 import com.gamingcastle.tournamentservice.service.TournamentService;
@@ -58,6 +52,13 @@ public class TournamentController {
     @GetMapping
     public ResponseEntity<List<TournamentResponse>> getAllTournaments() {
         return ResponseEntity.ok(tournamentService.getAllTournaments());
+    }
+
+    /** G11: Admin dashboard tournament stats widget. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/stats")
+    public ResponseEntity<AdminTournamentStatsResponse> getTournamentStats() {
+        return ResponseEntity.ok(tournamentService.getTournamentStats());
     }
 
     /** FR-14: Any authenticated user views a single tournament. */
