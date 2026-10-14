@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @Service
 public class RegistrationServiceImpl implements RegistrationService {
 
+    private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
+
     private final TournamentRepository tournamentRepository;
     private final TournamentRegistrationRepository registrationRepository;
     private final NotificationClient notificationClient;
@@ -143,7 +145,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private void sendRegistrationConfirmedNotification(Tournament tournament, String recipientEmail, String recipientName) {
         if (recipientEmail != null && !recipientEmail.isBlank()) {
             String startDateStr = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    .withZone(ZoneId.systemDefault())
+                    .withZone(SRI_LANKA_ZONE)
                     .format(tournament.getStartDate());
             String entryFeeStr = tournament.getEntryFee() != null
                     ? "LKR " + tournament.getEntryFee().toPlainString()

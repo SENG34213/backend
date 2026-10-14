@@ -21,7 +21,7 @@ public class TournamentReminderScheduler {
      * and sends 2-hour pre-tournament notification emails to registered participants.
      * Runs every 5 minutes.
      */
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 */5 * * * *", zone = "Asia/Colombo")
     public void schedulePreTournamentReminders() {
         log.info("Running scheduled check for upcoming 2-hour tournament reminders...");
         try {
