@@ -1,5 +1,6 @@
 package com.gamingcastle.bookingservice.controller;
 
+import org.springframework.data.web.PagedModel;
 import com.gamingcastle.bookingservice.config.GatewayHeaderAuthFilter;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
@@ -168,21 +169,37 @@ public class BookingController {
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin/all")
-    public ResponseEntity<Page<BookingResponse>> getAllBookings(
-            @RequestParam(required = false) BookingStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+    public PagedModel<BookingResponse> getAllBookings(
+        @RequestParam(value = "status", required = false)
+        BookingStatus status,
 
-        // cap page size at 100 to prevent runaway queries
-        size = Math.min(size, 100);
+        @RequestParam(value = "page", defaultValue = "0")
+        int page,
 
-        String[] sortParts = sort.split(",");
-        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
+        @RequestParam(value = "size", defaultValue = "20")
+        int size,
 
-        Page<BookingResponse> result = bookingService.getAllBookings(status, pageable);
-        return ResponseEntity.ok(result);
+        @RequestParam(value = "sort", defaultValue = "createdAt,desc")
+        String sortParam) {
+
+        int pageSize = Math.min(size, 100);
+
+        String[] parts = sortParam.split(",", -1);
+        String property = parts[0].trim();
+
+        Sort.Direction direction =
+                parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())
+                        ? Sort.Direction.ASC
+                        : Sort.Direction.DESC;
+
+        Pageable pageable = PageRequest.of(
+                page,
+                pageSize,
+                Sort.by(direction, property)
+        );
+
+        return new PagedModel<>(
+            bookingService.getAllBookings(status, pageable)
+);
     }
 }
