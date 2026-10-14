@@ -16,6 +16,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
+import com.gamingcastle.bookingservice.repository.BookingRepository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,6 +26,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.ArgumentMatchers.isNull;
 
 /**
  * Runs against the real Gateway-header-trust model: no JWT is involved here
@@ -43,6 +46,9 @@ class BookingControllerIntegrationTest {
 
     @Autowired
     private GameStationRepository gameStationRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
 
     @MockBean
     private PaymentClient paymentClient;
@@ -70,18 +76,20 @@ class BookingControllerIntegrationTest {
 
         // Mock PaymentClient.chargeBookingFee() to return a successful payment result
         // This allows all online booking tests to succeed instead of failing with 400 BAD_REQUEST
+       
         when(paymentClient.chargeBookingFee(
-                any(BigDecimal.class),
-                any(UUID.class),
-                any(UUID.class),
-                any(String.class),
-                any(Integer.class)))
-                .thenReturn(new PaymentClient.PaymentResult(
-                        UUID.randomUUID(),
-                        new BigDecimal("100.00"),
-                        BigDecimal.ZERO,
-                        new BigDecimal("100.00")
-                ));
+        any(BigDecimal.class),
+        any(UUID.class),
+        any(UUID.class),
+        nullable(String.class),
+        nullable(Integer.class)))
+        .thenReturn(new PaymentClient.PaymentResult(
+                UUID.randomUUID(),
+                new BigDecimal("100.00"),
+                BigDecimal.ZERO,
+                new BigDecimal("100.00")
+        ));
+
     }
 
     private HttpHeaders headersFor(UUID userId, String role) {
@@ -92,28 +100,60 @@ class BookingControllerIntegrationTest {
         return headers;
     }
 
-    @Test
-    void postBookings_asCustomer_shouldSucceed() {
-        // Arrange
-        Instant start = Instant.now().plus(10, ChronoUnit.DAYS);
-        Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
-        HttpEntity<BookingRequest> entity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
+    
+private Instant availableStartTime() {
+    Instant firstCandidate = Instant.now()
+            .plus(30, ChronoUnit.DAYS)
+            .truncatedTo(ChronoUnit.DAYS)
+            .plus(10, ChronoUnit.HOURS);
 
-        // Act
-        ResponseEntity<BookingResponse> response =
-                restTemplate.postForEntity("/api/bookings", entity, BookingResponse.class);
+    for (int day = 0; day < 365; day++) {
+        Instant candidate = firstCandidate.plus(day, ChronoUnit.DAYS);
+        Instant end = candidate.plus(1, ChronoUnit.HOURS);
 
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().userId()).isEqualTo(customerId);
+        if (bookingRepository.findOverlapping(
+                station.getId(), candidate, end).isEmpty()) {
+            return candidate;
+        }
     }
+
+    throw new IllegalStateException(
+            "No available test booking slot found within 365 days");
+}
+
+
+    
+
+
+@Test
+void postBookings_asCustomer_shouldSucceed() {
+    Instant start = availableStartTime();
+    Instant end = start.plus(1, ChronoUnit.HOURS);
+
+    BookingRequest request =
+            new BookingRequest(station.getId(), start, end);
+
+    HttpEntity<BookingRequest> entity =
+            new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
+
+    ResponseEntity<BookingResponse> response =
+            restTemplate.postForEntity(
+                    "/api/bookings",
+                    entity,
+                    BookingResponse.class
+            );
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().userId()).isEqualTo(customerId);
+}
+
+
 
     @Test
     void postWalkIn_asCustomer_shouldReturn403() {
         // Arrange
-        Instant start = Instant.now().plus(11, ChronoUnit.DAYS);
+        Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
         WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), start, end);
         HttpEntity<WalkInBookingRequest> entity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
@@ -129,7 +169,7 @@ class BookingControllerIntegrationTest {
     @Test
     void postWalkIn_asAdmin_shouldSucceed() {
         // Arrange
-        Instant start = Instant.now().plus(12, ChronoUnit.DAYS);
+        Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
         WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), start, end);
         HttpEntity<WalkInBookingRequest> entity = new HttpEntity<>(request, headersFor(adminId, "ADMIN"));
@@ -147,12 +187,17 @@ class BookingControllerIntegrationTest {
     @Test
     void cancelBooking_asDifferentCustomer_shouldReturn403() {
         // Arrange — create a booking as customerId
-        Instant start = Instant.now().plus(13, ChronoUnit.DAYS);
+        Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
         BookingRequest request = new BookingRequest(station.getId(), start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
         ResponseEntity<BookingResponse> createResponse =
                 restTemplate.postForEntity("/api/bookings", createEntity, BookingResponse.class);
+        assertThat(createResponse.getStatusCode())
+        .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
+        .isEqualTo(HttpStatus.CREATED);
+
+        assertThat(createResponse.getBody()).isNotNull();
         UUID bookingId = createResponse.getBody().id();
 
         UUID otherCustomerId = UUID.randomUUID();
@@ -169,12 +214,17 @@ class BookingControllerIntegrationTest {
     @Test
     void cancelBooking_asAdmin_shouldSucceed_evenForSomeoneElsesBooking() {
         // Arrange
-        Instant start = Instant.now().plus(14, ChronoUnit.DAYS);
+        Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
         BookingRequest request = new BookingRequest(station.getId(), start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
         ResponseEntity<BookingResponse> createResponse =
                 restTemplate.postForEntity("/api/bookings", createEntity, BookingResponse.class);
+                assertThat(createResponse.getStatusCode())
+        .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
+        .isEqualTo(HttpStatus.CREATED);
+
+assertThat(createResponse.getBody()).isNotNull();
         UUID bookingId = createResponse.getBody().id();
 
         HttpEntity<Void> cancelEntity = new HttpEntity<>(headersFor(adminId, "ADMIN"));
@@ -190,7 +240,7 @@ class BookingControllerIntegrationTest {
     @Test
     void getMyBookings_shouldReturnOnlyCallersBookings() {
         // Arrange
-        Instant start = Instant.now().plus(15, ChronoUnit.DAYS);
+        Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
         BookingRequest request = new BookingRequest(station.getId(), start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
