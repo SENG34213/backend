@@ -22,6 +22,9 @@ public final class APIEndPoints {
 
     public static final String adminRules = adminLoyalty + "/rules";
     public static final String adminAdjust = adminLoyalty + "/adjust";
+    public static final String adminStats = adminLoyalty + "/stats";
+    public static final String adminAccounts = adminLoyalty + "/accounts";
+    public static final String adminTransactions = adminLoyalty + "/transactions";
 
     public static final String award = internalLoyalty + "/award";
     public static final String redeemReserve = internalLoyalty + "/redeem/reserve";
