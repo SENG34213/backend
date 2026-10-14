@@ -131,6 +131,77 @@ public class UserServiceImpl implements UserService {
         );
     }
 
+    @Override
+    public Page<UserSummaryResponse> searchUsers(String query, com.gamingcastle.userservice.entity.Role role, Boolean enabled, Pageable pageable) {
+        String trimmedQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        org.springframework.data.jpa.domain.Specification<User> spec = (root, q, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+            if (role != null) {
+                predicates.add(cb.equal(root.get("role"), role));
+            }
+            if (enabled != null) {
+                predicates.add(cb.equal(root.get("enabled"), enabled));
+            }
+            if (trimmedQuery != null) {
+                String pattern = "%" + trimmedQuery.toLowerCase() + "%";
+                jakarta.persistence.criteria.Predicate nameLike = cb.like(cb.lower(root.get("fullName")), pattern);
+                jakarta.persistence.criteria.Predicate emailLike = cb.like(cb.lower(root.get("email")), pattern);
+                jakarta.persistence.criteria.Predicate phoneLike = cb.like(root.get("phoneNumber"), "%" + trimmedQuery + "%");
+                predicates.add(cb.or(nameLike, emailLike, phoneLike));
+            }
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        return userRepository.findAll(spec, pageable).map(this::toSummaryResponse);
+    }
+
+    @Override
+    public com.gamingcastle.userservice.dto.response.AdminUserStatsResponse getUserStats() {
+        java.time.ZoneId colomboZone = java.time.ZoneId.of("Asia/Colombo");
+        java.time.LocalDate today = java.time.LocalDate.now(colomboZone);
+        java.time.Instant startOfToday = today.atStartOfDay(colomboZone).toInstant();
+        java.time.Instant startOfMonth = today.withDayOfMonth(1).atStartOfDay(colomboZone).toInstant();
+
+        long total = userRepository.count();
+        long active = userRepository.countByEnabled(true);
+        long deactivated = userRepository.countByEnabled(false);
+        long customerCount = userRepository.countByRole(com.gamingcastle.userservice.entity.Role.CUSTOMER);
+        long adminCount = userRepository.countByRole(com.gamingcastle.userservice.entity.Role.ADMIN);
+        long newToday = userRepository.countByCreatedAtGreaterThanEqual(startOfToday);
+        long newMonth = userRepository.countByCreatedAtGreaterThanEqual(startOfMonth);
+
+        return new com.gamingcastle.userservice.dto.response.AdminUserStatsResponse(
+                total, active, deactivated, customerCount, adminCount, newToday, newMonth
+        );
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse adminUpdateUser(UUID userId, com.gamingcastle.userservice.dto.request.AdminUpdateUserRequest request) {
+        User user = findByIdOrThrow(userId);
+
+        if (request.fullName() != null && !request.fullName().isBlank()) {
+            user.setFullName(request.fullName().trim());
+        }
+        if (request.phoneNumber() != null) {
+            String phone = request.phoneNumber().trim();
+            user.setPhoneNumber(phone.isEmpty() ? null : phone);
+        }
+        if (request.role() != null) {
+            user.setRole(request.role());
+        }
+        if (request.enabled() != null) {
+            if (request.enabled() && !user.isEnabled()) {
+                user.activate();
+            } else if (!request.enabled() && user.isEnabled()) {
+                user.deactivate(DeactivatedBy.ADMIN);
+            }
+        }
+
+        user = userRepository.save(user);
+        log.info("Admin updated user: userId={}, role={}, enabled={}", userId, user.getRole(), user.isEnabled());
+        return toSummaryResponse(user);
+    }
+
     private UserSummaryResponse toSummaryResponse(User user) {
         return new UserSummaryResponse(
                 user.getId(),
