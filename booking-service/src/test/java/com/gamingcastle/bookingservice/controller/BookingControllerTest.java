@@ -68,6 +68,7 @@ class BookingControllerTest {
         BookingController controller = new BookingController(bookingService, notificationClient);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
 
         objectMapper = new ObjectMapper()
