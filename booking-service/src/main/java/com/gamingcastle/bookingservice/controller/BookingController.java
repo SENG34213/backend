@@ -175,7 +175,7 @@ public class BookingController {
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin/all")
-    public ResponseEntity<Page<AdminBookingRow>> getAllBookings(
+    public ResponseEntity<?> getAllBookings(
             @RequestParam(required = false) BookingStatus status,
             @RequestParam(required = false) BookingSource source,
             @RequestParam(required = false) UUID userId,
@@ -185,17 +185,25 @@ public class BookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
-
-        // cap page size at 100 to prevent runaway queries
+    
         size = Math.min(size, 100);
-
+    
         String[] sortParts = sort.split(",");
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+    
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
-
+    
+        // Keep the legacy admin page contract for the default request
+        if (source == null && userId == null && stationId == null && from == null && to == null) {
+            Page<BookingResponse> result = bookingService.getAllBookings(status, pageable);
+            return ResponseEntity.ok(result);
+        }
+    
         Page<AdminBookingRow> result = bookingService.getAdminBookings(
-                status, source, userId, stationId, from, to, pageable);
+                status, source, userId, stationId, from, to, pageable
+        );
         return ResponseEntity.ok(result);
     }
 
