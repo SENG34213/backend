@@ -15,4 +15,5 @@ public interface TournamentService {
     boolean isRegistrationOpen(UUID id);
     void sendPreTournamentReminders(UUID tournamentId);
     void processUpcomingPreTournamentReminders();
+    com.gamingcastle.tournamentservice.dto.AdminTournamentStatsResponse getTournamentStats();
 }

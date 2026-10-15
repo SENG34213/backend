@@ -1,8 +1,11 @@
 package com.gamingcastle.userservice.controller;
 
+import com.gamingcastle.userservice.dto.request.AdminUpdateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
+import com.gamingcastle.userservice.dto.response.AdminUserStatsResponse;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
+import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.security.GatewayAuthenticationFilter;
 import com.gamingcastle.userservice.service.UserService;
 import com.gamingcastle.userservice.util.APIEndPoints;
@@ -46,14 +49,35 @@ public class UserController {
     @GetMapping(APIEndPoints.users)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<UserSummaryResponse>> getAllUsers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Role role,
+            @RequestParam(required = false) Boolean enabled,
             @PageableDefault(size = 20) Pageable pageable) {
+        if (search != null || role != null || enabled != null) {
+            return ResponseEntity.ok(userService.searchUsers(search, role, enabled, pageable));
+        }
         return ResponseEntity.ok(userService.getAllUsers(pageable));
+    }
+
+    @GetMapping(APIEndPoints.userStats)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminUserStatsResponse> getUserStats() {
+        return ResponseEntity.ok(userService.getUserStats());
     }
 
     @GetMapping(APIEndPoints.userById)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserSummaryResponse> getUserById(@PathVariable UUID userId) {
         return ResponseEntity.ok(userService.getUserById(userId));
+    }
+
+    @PutMapping(APIEndPoints.userById)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserSummaryResponse> updateUser(
+            @PathVariable UUID userId,
+            @Valid @RequestBody AdminUpdateUserRequest request) {
+        log.info("Admin updating user details: targetUserId={}", userId);
+        return ResponseEntity.ok(userService.adminUpdateUser(userId, request));
     }
 
     @PatchMapping(APIEndPoints.deactivateMe)

@@ -5,15 +5,7 @@ import com.gamingcastle.loyaltyservice.dto.request.AwardPointsRequest;
 import com.gamingcastle.loyaltyservice.dto.request.CalculateRedemptionRequest;
 import com.gamingcastle.loyaltyservice.dto.request.RedeemPointsRequest;
 import com.gamingcastle.loyaltyservice.dto.request.UpdateLoyaltyRulesRequest;
-import com.gamingcastle.loyaltyservice.dto.response.AdminAdjustmentResponse;
-import com.gamingcastle.loyaltyservice.dto.response.AwardPointsResponse;
-import com.gamingcastle.loyaltyservice.dto.response.CalculationResponse;
-import com.gamingcastle.loyaltyservice.dto.response.LoyaltyAccountResponse;
-import com.gamingcastle.loyaltyservice.dto.response.LoyaltyRulesResponse;
-import com.gamingcastle.loyaltyservice.dto.response.LoyaltyStatusResponse;
-import com.gamingcastle.loyaltyservice.dto.response.RedemptionReservationResponse;
-import com.gamingcastle.loyaltyservice.dto.response.ReverseLoyaltyResponse;
-import com.gamingcastle.loyaltyservice.dto.response.TransactionHistoryResponse;
+import com.gamingcastle.loyaltyservice.dto.response.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -45,4 +37,10 @@ public interface LoyaltyService {
     ReverseLoyaltyResponse reverseBooking(UUID bookingId, String reason);
 
     List<UUID> findExpiredReservationBookingIds();
+
+    AdminLoyaltyStatsResponse getLoyaltyStats();
+
+    Page<LoyaltyAccountResponse> getAllAccounts(Pageable pageable);
+
+    Page<TransactionHistoryResponse> getAllTransactions(Pageable pageable);
 }

@@ -1,26 +1,40 @@
 package com.gamingcastle.paymentservice.service;
 
 import com.gamingcastle.paymentservice.dto.request.PaymentRequest;
+import com.gamingcastle.paymentservice.dto.response.AdminPaymentStatsResponse;
 import com.gamingcastle.paymentservice.dto.response.PaymentResponse;
 import com.gamingcastle.paymentservice.client.LoyaltyClient;
 import com.gamingcastle.paymentservice.entity.Payment;
+import com.gamingcastle.paymentservice.entity.PaymentMethod;
 import com.gamingcastle.paymentservice.entity.PaymentStatus;
 import com.gamingcastle.paymentservice.entity.ReferenceType;
 import com.gamingcastle.paymentservice.gateway.PaymentGateway;
 import com.gamingcastle.paymentservice.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final ZoneId SLST = ZoneId.of("Asia/Colombo");
 
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
@@ -116,9 +130,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse processCashPayment(
-            PaymentRequest request,
-            UUID userId) {
+    public PaymentResponse processCashPayment(PaymentRequest request, UUID userId) {
 
         Optional<Payment> existingPayment =
                 paymentRepository.findByIdempotencyKey(request.getIdempotencyKey());
@@ -164,11 +176,117 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentReceipt(UUID paymentId, UUID userId, String role) {
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Payment not found: " + paymentId
+                ));
+
+        if ("ADMIN".equals(role)) {
+            return toResponse(payment);
+        }
+
+        if ("CUSTOMER".equals(role) && !payment.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("You are not authorized to access this payment");
+        }
+
+        throw new IllegalArgumentException("You are not authorized to access this payment");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getMyPayments(UUID userId) {
+        return paymentRepository.findByUserId(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ── G7: Admin paged payment log ───────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PaymentResponse> getAdminPayments(
+            PaymentStatus status,
+            PaymentMethod method,
+            ReferenceType referenceType,
+            UUID userId,
+            Instant from,
+            Instant to,
+            Pageable pageable) {
+
+        Specification<Payment> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (method != null) {
+                predicates.add(cb.equal(root.get("method"), method));
+            }
+            if (referenceType != null) {
+                predicates.add(cb.equal(root.get("referenceType"), referenceType));
+            }
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("userId"), userId));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return paymentRepository
+                .findAll(spec, pageable)
+                .map(this::toResponse);
+    }
+
+    // ── G11: Admin dashboard payment stats ───────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminPaymentStatsResponse getPaymentStats(int trendDays) {
+
+        ZonedDateTime nowSlst = ZonedDateTime.now(SLST);
+
+        Instant todayStart = nowSlst.toLocalDate().atStartOfDay(SLST).toInstant();
+        Instant todayEnd   = todayStart.plus(1, ChronoUnit.DAYS);
+        Instant monthStart = nowSlst.toLocalDate().withDayOfMonth(1).atStartOfDay(SLST).toInstant();
+
+        BigDecimal todayRevenue = paymentRepository.sumRevenueInRange(todayStart, todayEnd);
+        BigDecimal monthRevenue = paymentRepository.sumRevenueInRange(monthStart, todayEnd);
+
+        long successTotal = paymentRepository.countByStatusInRange(
+                PaymentStatus.SUCCESS, Instant.EPOCH, Instant.now());
+        long failedTotal = paymentRepository.countByStatusInRange(
+                PaymentStatus.FAILED, Instant.EPOCH, Instant.now());
+
+        Instant trendFrom = nowSlst.toLocalDate()
+                .minusDays(trendDays - 1L)
+                .atStartOfDay(SLST)
+                .toInstant();
+
+        List<Object[]> rows = paymentRepository.dailyRevenueSince(trendFrom);
+
+        List<AdminPaymentStatsResponse.DailyRevenue> trend = rows.stream()
+                .map(r -> new AdminPaymentStatsResponse.DailyRevenue(
+                        r[0].toString(),
+                        new BigDecimal(r[1].toString())))
+                .toList();
+
+        return new AdminPaymentStatsResponse(todayRevenue, monthRevenue, successTotal, failedTotal, trend);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private void validateAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Payment amount must be greater than zero"
-            );
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
         }
     }
 
@@ -193,51 +311,5 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
-    }
-
-
-    @Override
-    @Transactional(readOnly = true)
-    public PaymentResponse getPaymentReceipt(
-            UUID paymentId,
-            UUID userId,
-            String role) {
-
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Payment not found: " + paymentId
-                ));
-
-        // Admins can access any payment receipt.
-        if ("ADMIN".equals(role)) {
-            return toResponse(payment);
-        }
-
-        // Customers can access only their own payment receipts.
-        if ("CUSTOMER".equals(role)) {
-            if (!payment.getUserId().equals(userId)) {
-                throw new IllegalArgumentException(
-                        "You are not authorized to access this payment"
-                );
-            }
-
-            // Important: return the receipt when the customer owns the payment.
-            return toResponse(payment);
-        }
-
-        throw new IllegalArgumentException(
-                "You are not authorized to access this payment"
-        );
-    }
-
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PaymentResponse> getMyPayments(UUID userId) {
-
-        return paymentRepository.findByUserId(userId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
     }
 }

@@ -24,6 +24,8 @@ import java.util.UUID;
 @Service
 public class GameStationServiceImpl implements GameStationService {
 
+    private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
+
     private final GameStationRepository gameStationRepository;
     private final BookingRepository bookingRepository;
 
@@ -102,7 +104,7 @@ public class GameStationServiceImpl implements GameStationService {
     public List<SlotAvailabilityResponse> getStationAvailability(UUID id, LocalDate date) {
         findOrThrow(id);
 
-        ZoneId zone = ZoneId.systemDefault();
+        ZoneId zone = SRI_LANKA_ZONE;
         List<SlotAvailabilityResponse> slots = new ArrayList<>();
 
         // Generate 1-hour time slots from 09:00 to 22:00 for the requested date

@@ -3,13 +3,13 @@ package com.gamingcastle.loyaltyservice.controller;
 import com.gamingcastle.loyaltyservice.api.APIEndPoints;
 import com.gamingcastle.loyaltyservice.dto.request.AdjustPointsRequest;
 import com.gamingcastle.loyaltyservice.dto.request.UpdateLoyaltyRulesRequest;
-import com.gamingcastle.loyaltyservice.dto.response.AdminAdjustmentResponse;
-import com.gamingcastle.loyaltyservice.dto.response.LoyaltyRulesResponse;
+import com.gamingcastle.loyaltyservice.dto.response.*;
 import com.gamingcastle.loyaltyservice.security.GatewayAuthenticationFilter;
 import com.gamingcastle.loyaltyservice.service.LoyaltyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -49,5 +49,28 @@ public class LoyaltyAdminController {
     public ResponseEntity<AdminAdjustmentResponse> adjustPoints(
             @Valid @RequestBody AdjustPointsRequest request) {
         return ResponseEntity.ok(loyaltyService.adjustPoints(request));
+    }
+
+    @Operation(summary = "Get loyalty program stats")
+    @GetMapping(APIEndPoints.adminStats)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminLoyaltyStatsResponse> getLoyaltyStats() {
+        return ResponseEntity.ok(loyaltyService.getLoyaltyStats());
+    }
+
+    @Operation(summary = "List all loyalty accounts with pagination")
+    @GetMapping(APIEndPoints.adminAccounts)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<LoyaltyAccountResponse>> getAllAccounts(
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(loyaltyService.getAllAccounts(pageable));
+    }
+
+    @Operation(summary = "List all loyalty transactions with pagination")
+    @GetMapping(APIEndPoints.adminTransactions)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<TransactionHistoryResponse>> getAllTransactions(
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(loyaltyService.getAllTransactions(pageable));
     }
 }

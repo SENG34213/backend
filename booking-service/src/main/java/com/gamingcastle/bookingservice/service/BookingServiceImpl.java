@@ -1,5 +1,7 @@
 package com.gamingcastle.bookingservice.service;
 
+import com.gamingcastle.bookingservice.dto.AdminBookingRow;
+import com.gamingcastle.bookingservice.dto.AdminBookingStatsResponse;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.client.LoyaltyClient;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
@@ -30,7 +33,11 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 
 /**
  * FR-07–FR-13: slot booking, availability, cancellation.
@@ -39,6 +46,7 @@ import org.springframework.data.domain.Pageable;
 public class BookingServiceImpl implements BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
+    private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
 
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
@@ -160,8 +168,8 @@ public class BookingServiceImpl implements BookingService {
     private void sendBookingConfirmedEmail(Booking booking, BigDecimal amount) {
         // Non-critical — failure is logged but does not roll back the booking
         try {
-            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
-            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
+            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(SRI_LANKA_ZONE);
+            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(SRI_LANKA_ZONE);
 
             String email = null;
             String fullName = null;
@@ -327,5 +335,132 @@ public class BookingServiceImpl implements BookingService {
         }
         return bookingRepository.findAll(pageable)
                 .map(BookingResponse::from);
+    }
+
+    @Override
+    public Page<AdminBookingRow> getAdminBookings(
+            BookingStatus status,
+            BookingSource source,
+            UUID userId,
+            UUID stationId,
+            Instant from,
+            Instant to,
+            Pageable pageable
+    ) {
+        Specification<Booking> spec = buildFilterSpec(status, source, userId, stationId, from, to);
+        return bookingRepository.findAll(spec, pageable)
+                .map(this::toAdminRow);
+    }
+
+    @Override
+    public AdminBookingStatsResponse getBookingStats() {
+        java.time.LocalDate today = java.time.LocalDate.now(SRI_LANKA_ZONE);
+        Instant startOfToday = today.atStartOfDay(SRI_LANKA_ZONE).toInstant();
+        Instant endOfToday = today.plusDays(1).atStartOfDay(SRI_LANKA_ZONE).toInstant();
+
+        java.time.LocalDate firstDayOfMonth = today.withDayOfMonth(1);
+        Instant startOfMonth = firstDayOfMonth.atStartOfDay(SRI_LANKA_ZONE).toInstant();
+
+        long todayTotal = bookingRepository.countByCreatedAtBetween(startOfToday, endOfToday);
+        long todayConfirmed = bookingRepository.countByStatusAndCreatedAtBetween(BookingStatus.CONFIRMED, startOfToday, endOfToday);
+        long todayCancelled = bookingRepository.countByStatusAndCreatedAtBetween(BookingStatus.CANCELLED, startOfToday, endOfToday);
+        long activeSessionsNow = bookingRepository.countActiveSessionsAt(Instant.now());
+        long monthTotal = bookingRepository.countByCreatedAtBetween(startOfMonth, endOfToday);
+        long allTimeTotal = bookingRepository.count();
+        long allTimeCancelled = bookingRepository.countByStatus(BookingStatus.CANCELLED);
+
+        return new AdminBookingStatsResponse(
+                todayTotal,
+                todayConfirmed,
+                todayCancelled,
+                activeSessionsNow,
+                monthTotal,
+                allTimeTotal,
+                allTimeCancelled
+        );
+    }
+
+    @Override
+    public List<AdminBookingRow> getBookingsForExport(
+            BookingStatus status,
+            BookingSource source,
+            UUID userId,
+            UUID stationId,
+            Instant from,
+            Instant to
+    ) {
+        Specification<Booking> spec = buildFilterSpec(status, source, userId, stationId, from, to);
+        Pageable limit = PageRequest.of(0, 10_000, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return bookingRepository.findAll(spec, limit)
+                .map(this::toAdminRow)
+                .getContent();
+    }
+
+    private Specification<Booking> buildFilterSpec(
+            BookingStatus status,
+            BookingSource source,
+            UUID userId,
+            UUID stationId,
+            Instant from,
+            Instant to
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (source != null) {
+                predicates.add(cb.equal(root.get("source"), source));
+            }
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("userId"), userId));
+            }
+            if (stationId != null) {
+                predicates.add(cb.equal(root.get("station").get("id"), stationId));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("startTime"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("startTime"), to));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private AdminBookingRow toAdminRow(Booking b) {
+        long durationMinutes = java.time.Duration.between(b.getStartTime(), b.getEndTime()).toMinutes();
+        BigDecimal hours = BigDecimal.valueOf(durationMinutes).divide(BigDecimal.valueOf(60), 4, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = (b.getStation() != null && b.getStation().getHourlyRate() != null)
+                ? b.getStation().getHourlyRate().multiply(hours).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal payableAmount = totalAmount;
+
+        String stationType = (b.getStation() != null && b.getStation().getType() != null)
+                ? b.getStation().getType().name()
+                : null;
+        String stationCode = b.getStation() != null ? b.getStation().getStationCode() : null;
+        UUID stationId = b.getStation() != null ? b.getStation().getId() : null;
+        BigDecimal hourlyRate = b.getStation() != null ? b.getStation().getHourlyRate() : null;
+
+        return new AdminBookingRow(
+                b.getId(),
+                b.getUserId(),
+                stationId,
+                stationCode,
+                stationType,
+                hourlyRate,
+                b.getStartTime(),
+                b.getEndTime(),
+                durationMinutes,
+                b.getStatus(),
+                b.getSource(),
+                b.getPaymentId(),
+                totalAmount,
+                discountAmount,
+                payableAmount,
+                b.getCreatedAt()
+        );
     }
 }

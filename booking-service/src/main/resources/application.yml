@@ -8,12 +8,16 @@ spring:
     url: ${BOOKING_DB_URL}
     username: ${BOOKING_DB_USER}
     password: ${BOOKING_DB_PASSWORD}
+  jackson:
+    time-zone: Asia/Colombo
   jpa:
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          time_zone: Asia/Colombo
     show-sql: false
   flyway:
     enabled: true

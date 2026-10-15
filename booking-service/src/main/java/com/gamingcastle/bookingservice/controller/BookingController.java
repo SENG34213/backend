@@ -2,6 +2,8 @@ package com.gamingcastle.bookingservice.controller;
 
 import org.springframework.data.web.PagedModel;
 import com.gamingcastle.bookingservice.config.GatewayHeaderAuthFilter;
+import com.gamingcastle.bookingservice.dto.AdminBookingRow;
+import com.gamingcastle.bookingservice.dto.AdminBookingStatsResponse;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.dto.ConfirmBookingRequest;
@@ -15,11 +17,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
 
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +39,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
+
+    private static final java.time.ZoneId SRI_LANKA_ZONE = java.time.ZoneId.of("Asia/Colombo");
 
     private final BookingService bookingService;
     private final NotificationClient notificationClient;
@@ -100,10 +109,10 @@ public class BookingController {
 
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
 
             notificationClient.sendBookingCancelled(new NotificationClient.BookingEmailRequest(
@@ -129,10 +138,10 @@ public class BookingController {
 
         if (email != null && !email.isBlank()) {
             String timeSlot = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
             String dateStr = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                .withZone(java.time.ZoneId.systemDefault())
+                .withZone(SRI_LANKA_ZONE)
                 .format(response.startTime());
 
             notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
@@ -159,47 +168,84 @@ public class BookingController {
 
     /**
      * Admin: paginated list of ALL bookings across all users.
+    /**
+     * Admin: enriched, paginated list of ALL bookings across all users with multi-parameter filtering.
      *
-     * GET /api/bookings/admin/all?page=0&size=20&sort=createdAt,desc&status=CONFIRMED
-     *
-     * @param status optional filter (PENDING, CONFIRMED, CANCELLED)
-     * @param page   zero-based page number (default 0)
-     * @param size   page size (default 20, max 100)
-     * @param sort   sort field + direction, e.g. "createdAt,desc"
+     * GET /api/bookings/admin/all
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin/all")
-    public PagedModel<BookingResponse> getAllBookings(
-        @RequestParam(value = "status", required = false)
-        BookingStatus status,
+    public ResponseEntity<Page<AdminBookingRow>> getAllBookings(
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(required = false) BookingSource source,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) UUID stationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
 
-        @RequestParam(value = "page", defaultValue = "0")
-        int page,
+        // cap page size at 100 to prevent runaway queries
+        size = Math.min(size, 100);
 
-        @RequestParam(value = "size", defaultValue = "20")
-        int size,
+        String[] sortParts = sort.split(",");
+        Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
 
-        @RequestParam(value = "sort", defaultValue = "createdAt,desc")
-        String sortParam) {
+        Page<AdminBookingRow> result = bookingService.getAdminBookings(
+                status, source, userId, stationId, from, to, pageable);
+        return ResponseEntity.ok(result);
+    }
 
-        int pageSize = Math.min(size, 100);
+    // ── G11: Admin dashboard booking stats ────────────────────────────────────
 
-        String[] parts = sortParam.split(",", -1);
-        String property = parts[0].trim();
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/stats")
+    public ResponseEntity<AdminBookingStatsResponse> getBookingStats() {
+        return ResponseEntity.ok(bookingService.getBookingStats());
+    }
 
-        Sort.Direction direction =
-                parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())
-                        ? Sort.Direction.ASC
-                        : Sort.Direction.DESC;
+    // ── G13: CSV export of bookings ───────────────────────────────────────────
 
-        Pageable pageable = PageRequest.of(
-                page,
-                pageSize,
-                Sort.by(direction, property)
-        );
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping(value = "/admin/export.csv", produces = "text/csv")
+    public ResponseEntity<String> exportBookingsCsv(
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(required = false) BookingSource source,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) UUID stationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
 
-        return new PagedModel<>(
-            bookingService.getAllBookings(status, pageable)
-);
+        List<AdminBookingRow> bookings = bookingService.getBookingsForExport(
+                status, source, userId, stationId, from, to);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Booking ID,User ID,Station ID,Station Code,Station Type,Hourly Rate,Start Time,End Time,Duration (Mins),Status,Source,Payment ID,Total Amount,Discount Amount,Payable Amount,Created At\n");
+        for (AdminBookingRow b : bookings) {
+            sb.append(b.id()).append(",")
+              .append(b.userId()).append(",")
+              .append(b.stationId()).append(",")
+              .append(b.stationCode() != null ? b.stationCode() : "").append(",")
+              .append(b.stationType() != null ? b.stationType() : "").append(",")
+              .append(b.hourlyRate() != null ? b.hourlyRate() : "").append(",")
+              .append(b.startTime()).append(",")
+              .append(b.endTime()).append(",")
+              .append(b.durationMinutes()).append(",")
+              .append(b.status()).append(",")
+              .append(b.source()).append(",")
+              .append(b.paymentId() != null ? b.paymentId() : "").append(",")
+              .append(b.totalAmount() != null ? b.totalAmount() : "").append(",")
+              .append(b.discountAmount() != null ? b.discountAmount() : "").append(",")
+              .append(b.payableAmount() != null ? b.payableAmount() : "").append(",")
+              .append(b.createdAt()).append("\n");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"bookings_export.csv\"");
+        headers.setContentType(MediaType.parseMediaType("text/csv"));
+        return ResponseEntity.ok().headers(headers).body(sb.toString());
     }
 }

@@ -1,5 +1,7 @@
 package com.gamingcastle.bookingservice.service;
 
+import com.gamingcastle.bookingservice.dto.AdminBookingRow;
+import com.gamingcastle.bookingservice.dto.AdminBookingStatsResponse;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.entity.BookingSource;
@@ -7,6 +9,7 @@ import com.gamingcastle.bookingservice.entity.BookingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,14 +31,13 @@ public interface BookingService {
     List<BookingResponse> getBookingsForUser(UUID userId);
 
     /**
-     * @param callerId the authenticated caller
+     * @param callerId      the authenticated caller
      * @param callerIsAdmin true if the caller's role is ADMIN — admins may
      *                      cancel any booking, customers only their own
      */
     BookingResponse cancelBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin);
-    /**
-     * Reschedule an existing CONFIRMED booking
-     */
+
+    /** Reschedule an existing CONFIRMED booking */
     BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request);
 
     /**
@@ -53,4 +55,35 @@ public interface BookingService {
      * @param pageable page + sort info (e.g. page=0&size=20&sort=createdAt,desc)
      */
     Page<BookingResponse> getAllBookings(BookingStatus status, Pageable pageable);
-}
+
+    // ── G10: Admin enriched booking list with filters ─────────────────────────
+
+    /**
+     * Admin: enriched, multi-filter paged booking list.
+     * All filter params are optional (null = no filter).
+     */
+    Page<AdminBookingRow> getAdminBookings(
+            BookingStatus status,
+            BookingSource source,
+            UUID userId,
+            UUID stationId,
+            Instant from,
+            Instant to,
+            Pageable pageable
+    );
+
+    // ── G11: Admin dashboard booking stats ────────────────────────────────────
+
+    AdminBookingStatsResponse getBookingStats();
+
+    // ── G13: CSV export ───────────────────────────────────────────────────────
+
+    List<AdminBookingRow> getBookingsForExport(
+            BookingStatus status,
+            BookingSource source,
+            UUID userId,
+            UUID stationId,
+            Instant from,
+            Instant to
+    );
+}

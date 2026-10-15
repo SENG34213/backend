@@ -9,5 +9,10 @@ import java.util.UUID;
 
 public interface TournamentRepository extends JpaRepository<Tournament, UUID> {
     List<Tournament> findByStartDateLessThanEqualAndReminderSentFalse(Instant maxStartDate);
+
+    long countByStatus(com.gamingcastle.tournamentservice.entity.TournamentStatus status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(t.participantCount), 0) FROM Tournament t")
+    long sumTotalParticipants();
 }
 
