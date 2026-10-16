@@ -338,6 +338,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<AdminBookingRow> getAdminBookings(
             BookingStatus status,
             BookingSource source,

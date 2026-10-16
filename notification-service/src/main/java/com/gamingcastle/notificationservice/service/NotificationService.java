@@ -13,17 +13,20 @@ public class NotificationService {
     private final SmsService smsService;
     private final NotificationRecordService notificationRecordService;
     private final EmailTemplateService emailTemplateService;
+    private final SocketNotificationBroadcaster socketNotificationBroadcaster;
 
     public NotificationService(
             EmailSenderService emailSenderService,
             SmsService smsService,
             NotificationRecordService notificationRecordService,
-            EmailTemplateService emailTemplateService
+            EmailTemplateService emailTemplateService,
+            SocketNotificationBroadcaster socketNotificationBroadcaster
     ) {
         this.emailSenderService = emailSenderService;
         this.smsService = smsService;
         this.notificationRecordService = notificationRecordService;
         this.emailTemplateService = emailTemplateService;
+        this.socketNotificationBroadcaster = socketNotificationBroadcaster;
     }
 
     public void sendWelcomeEmail(WelcomeEmailRequest request) {
@@ -56,6 +59,14 @@ public class NotificationService {
                 NotificationType.BOOKING_CONFIRMATION,
                 emailTemplateService.createBookingConfirmationEmail(request)
         );
+        socketNotificationBroadcaster.broadcast(
+                "BOOKING_CREATED",
+                "BOOKING",
+                "New Booking Confirmed",
+                "Station " + request.gameStationName() + " booked by " + request.customerName() + " (" + request.timeSlot() + ")",
+                request.bookingId(),
+                "/admin/bookings"
+        );
     }
 
     public void sendBookingRescheduledEmail(BookingEmailRequest request) {
@@ -63,6 +74,14 @@ public class NotificationService {
                 request.email(),
                 NotificationType.BOOKING_RESCHEDULED,
                 emailTemplateService.createBookingRescheduledEmail(request)
+        );
+        socketNotificationBroadcaster.broadcast(
+                "BOOKING_RESCHEDULED",
+                "RESCHEDULE",
+                "Booking Rescheduled",
+                "Booking #" + request.bookingId() + " at " + request.gameStationName() + " rescheduled to " + request.timeSlot(),
+                request.bookingId(),
+                "/admin/bookings"
         );
     }
 
@@ -72,6 +91,14 @@ public class NotificationService {
                 NotificationType.BOOKING_CANCELLED,
                 emailTemplateService.createBookingCancelledEmail(request)
         );
+        socketNotificationBroadcaster.broadcast(
+                "BOOKING_CANCELLED",
+                "CANCEL",
+                "Booking Cancelled",
+                "Booking #" + request.bookingId() + " for " + request.customerName() + " at " + request.gameStationName() + " was cancelled",
+                request.bookingId(),
+                "/admin/bookings"
+        );
     }
 
     public void sendTournamentRegistrationEmail(TournamentRegistrationEmailRequest request) {
@@ -80,6 +107,14 @@ public class NotificationService {
                 NotificationType.TOURNAMENT_REGISTRATION_CONFIRMED,
                 emailTemplateService.createTournamentRegistrationEmail(request)
         );
+        socketNotificationBroadcaster.broadcast(
+                "TOURNAMENT_REGISTRATION",
+                "TOURNAMENT",
+                "Tournament Enrollment",
+                request.customerName() + " registered for " + request.tournamentName() + " (" + request.gameTitle() + ")",
+                null,
+                "/admin/tournaments"
+        );
     }
 
     public void sendTournamentCancelledEmail(TournamentCancelledEmailRequest request) {
@@ -87,6 +122,14 @@ public class NotificationService {
                 request.email(),
                 NotificationType.TOURNAMENT_CANCELLED,
                 emailTemplateService.createTournamentCancelledEmail(request)
+        );
+        socketNotificationBroadcaster.broadcast(
+                "TOURNAMENT_CANCELLED",
+                "CANCEL",
+                "Tournament Cancelled",
+                request.tournamentName() + " has been cancelled",
+                null,
+                "/admin/tournaments"
         );
     }
 

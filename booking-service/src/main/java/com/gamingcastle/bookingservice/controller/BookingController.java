@@ -195,12 +195,6 @@ public class BookingController {
     
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
     
-        // Keep the legacy admin page contract for the default request
-        if (source == null && userId == null && stationId == null && from == null && to == null) {
-            Page<BookingResponse> result = bookingService.getAllBookings(status, pageable);
-            return ResponseEntity.ok(result);
-        }
-    
         Page<AdminBookingRow> result = bookingService.getAdminBookings(
                 status, source, userId, stationId, from, to, pageable
         );
