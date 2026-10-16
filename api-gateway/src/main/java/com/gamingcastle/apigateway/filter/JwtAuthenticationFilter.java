@@ -41,7 +41,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/auth/login",          // covers /api/auth/login and /api/auth/login/phone (FR-03)
             "/api/auth/password",       // covers /api/auth/password/forgot and /reset (FR-04/FR-05)
             "/api/auth/reactivate",     // covers /reactivate/request and /confirm (self-deactivated users, no token yet)
-            "/actuator"
+            "/actuator",
+            "/api/stations",            // public station browsing and availability (FR-06/G1)
+            "/api/tournaments"          // public tournament browsing
     );
 
     @Override
@@ -49,11 +51,39 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
+        String authHeader = request.getHeaders().getFirst("Authorization");
+
         if (isPublicPath(path)) {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                try {
+                    SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+                    Claims claims = Jwts.parser()
+                            .verifyWith(key)
+                            .build()
+                            .parseSignedClaims(authHeader.substring(7))
+                            .getPayload();
+
+                    String userId = claims.getSubject();
+                    String role = claims.get("role", String.class);
+                    String email = claims.get("email", String.class);
+                    String fullName = claims.get("fullName", String.class);
+
+                    ServerHttpRequest mutatedRequest = request.mutate()
+                            .header("X-User-Id", userId)
+                            .header("X-User-Role", role)
+                            .header("X-User-Email", email != null ? email : "")
+                            .header("X-User-FullName", fullName != null ? fullName : "")
+                            .header("X-Gateway-Secret", gatewayInternalSecret)
+                            .build();
+
+                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                } catch (Exception ex) {
+                    // Continue anonymously on public paths
+                }
+            }
             return chain.filter(exchange);
         }
 
-        String authHeader = request.getHeaders().getFirst("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return unauthorized(exchange, "Missing or malformed Authorization header");
         }

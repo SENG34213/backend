@@ -114,13 +114,33 @@ public class PaymentClient {
         } catch (HttpClientErrorException e) {
             log.error("Payment service rejected booking fee for bookingId={}: HTTP {} {}",
                     bookingId, e.getStatusCode(), e.getResponseBodyAsString());
-            throw new BookingException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED",
-                    "Payment service error (" + e.getStatusCode() + ") for bookingId: " + bookingId);
+            String detail = extractErrorMessage(e.getResponseBodyAsString());
+            String message = (detail != null && !detail.isBlank())
+                    ? "Payment service error (" + e.getStatusCode() + "): " + detail
+                    : "Payment service error (" + e.getStatusCode() + ") for bookingId: " + bookingId;
+            throw new BookingException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED", message);
         } catch (Exception e) {
             log.error("Could not reach payment service for bookingId={}: {}", bookingId, e.getMessage());
             throw new BookingException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED",
                     "Could not reach payment service for bookingId: " + bookingId + " — " + e.getMessage());
         }
+    }
+
+    private String extractErrorMessage(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(responseBody);
+            if (node.hasNonNull("message")) {
+                return node.get("message").asText();
+            }
+            if (node.hasNonNull("error")) {
+                return node.get("error").asText();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     // ── Internal DTOs ──────────────────────────────────────────────────────────
