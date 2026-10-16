@@ -51,7 +51,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(MockitoExtension.class)
 @WebMvcTest(BookingController.class)
 class BookingControllerTest {
 
@@ -65,7 +64,7 @@ class BookingControllerTest {
     @MockBean
     private BookingService bookingService;
 
-    @Mock
+    @MockBean
     private NotificationClient notificationClient;
 
     private UUID userId;
