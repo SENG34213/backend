@@ -37,4 +37,9 @@ public class GameStation {
 
     @Builder.Default
     private boolean active = true;
+
+    @ManyToMany(mappedBy = "stations", fetch = FetchType.LAZY)
+    @Builder.Default
+    private java.util.Set<GameTitle> games = new java.util.HashSet<>();
 }
+

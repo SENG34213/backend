@@ -24,7 +24,14 @@ public record BookingResponse(
         Instant createdAt
 ) {
     public static BookingResponse from(Booking booking) {
-        return from(booking, null, null, null);
+        if (booking == null) return null;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        if (booking.getStation() != null && booking.getStation().getHourlyRate() != null && booking.getStartTime() != null && booking.getEndTime() != null) {
+            long durationMinutes = java.time.Duration.between(booking.getStartTime(), booking.getEndTime()).toMinutes();
+            BigDecimal hours = BigDecimal.valueOf(durationMinutes).divide(BigDecimal.valueOf(60), 4, java.math.RoundingMode.HALF_UP);
+            totalAmount = booking.getStation().getHourlyRate().multiply(hours).setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+        return from(booking, totalAmount, BigDecimal.ZERO, totalAmount);
     }
 
     public static BookingResponse from(Booking booking, BigDecimal totalAmount, BigDecimal discountAmount, BigDecimal payableAmount) {

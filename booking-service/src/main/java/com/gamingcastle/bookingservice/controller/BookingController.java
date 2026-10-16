@@ -185,22 +185,24 @@ public class BookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
-    
+
+        // enforce maximum page size
         size = Math.min(size, 100);
-    
+
         String[] sortParts = sort.split(",");
         Sort.Direction direction = sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
-    
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParts[0]));
-    
-        // Keep the legacy admin page contract for the default request
+
+        // If no advanced filters are provided, use the simple paginated API (Page<BookingResponse>)
         if (source == null && userId == null && stationId == null && from == null && to == null) {
             Page<BookingResponse> result = bookingService.getAllBookings(status, pageable);
             return ResponseEntity.ok(result);
         }
-    
+
+        // Otherwise, use the enriched admin bookings API (Page<AdminBookingRow>)
         Page<AdminBookingRow> result = bookingService.getAdminBookings(
                 status, source, userId, stationId, from, to, pageable
         );
