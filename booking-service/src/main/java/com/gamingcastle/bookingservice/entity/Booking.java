@@ -33,6 +33,10 @@ public class Booking {
     @JoinColumn(name = "station_id", nullable = false)
     private GameStation station;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "game_id")
+    private GameTitle game;
+
     @Column(nullable = false)
     private Instant startTime;
 

@@ -80,7 +80,7 @@ public class BookingController {
 
         BookingResponse response = bookingService.createBooking(
                 request.targetUserId(),
-                new BookingRequest(request.stationId(), request.startTime(), request.endTime()),
+                new BookingRequest(request.stationId(), request.gameId(), request.startTime(), request.endTime()),
                 BookingSource.WALK_IN
         );
 

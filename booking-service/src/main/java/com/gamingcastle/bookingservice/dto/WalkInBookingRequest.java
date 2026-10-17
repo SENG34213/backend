@@ -16,6 +16,7 @@ import java.util.UUID;
 public record WalkInBookingRequest(
         @NotNull UUID targetUserId,
         @NotNull UUID stationId,
+        @NotNull UUID gameId,
         @NotNull @Future Instant startTime,
         @NotNull @Future Instant endTime
 ) {}

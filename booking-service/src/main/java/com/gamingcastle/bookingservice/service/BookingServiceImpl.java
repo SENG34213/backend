@@ -5,12 +5,10 @@ import com.gamingcastle.bookingservice.dto.AdminBookingStatsResponse;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.client.LoyaltyClient;
-import com.gamingcastle.bookingservice.entity.Booking;
-import com.gamingcastle.bookingservice.entity.BookingSource;
-import com.gamingcastle.bookingservice.entity.BookingStatus;
-import com.gamingcastle.bookingservice.entity.GameStation;
+import com.gamingcastle.bookingservice.entity.*;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
+import com.gamingcastle.bookingservice.repository.GameRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
@@ -50,6 +48,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final GameStationRepository gameStationRepository;
+    private final GameRepository gameRepository;
     private final LoyaltyClient loyaltyClient;
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
@@ -61,12 +60,14 @@ public class BookingServiceImpl implements BookingService {
     public BookingServiceImpl(
             BookingRepository bookingRepository,
             GameStationRepository gameStationRepository,
+            GameRepository gameRepository,
             LoyaltyClient loyaltyClient,
             PaymentClient paymentClient,
             NotificationClient notificationClient,
             UserClient userClient) {
         this.bookingRepository = bookingRepository;
         this.gameStationRepository = gameStationRepository;
+        this.gameRepository = gameRepository;
         this.loyaltyClient = loyaltyClient;
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
@@ -90,6 +91,8 @@ public class BookingServiceImpl implements BookingService {
                     "Station " + station.getStationCode() + " is not currently active");
         }
 
+        GameTitle game = validateGameOnStation(station, request.gameId());
+
         // AC2/AC3: reject overlapping PENDING/CONFIRMED bookings, but allow
         // adjacent slots and ignore CANCELLED bookings — both handled by the
         // existing findOverlapping() query, which already filters by status.
@@ -103,6 +106,7 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = Booking.builder()
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(request.startTime())
                 .endTime(request.endTime())
                 .status(BookingStatus.PENDING)
@@ -162,6 +166,25 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return BookingResponse.from(booking, totalAmount, discountAmount, payableAmount);
+    }
+
+    private GameTitle validateGameOnStation(GameStation station, UUID gameId) {
+        if (gameId == null) {
+            throw new BookingException(HttpStatus.BAD_REQUEST, "GAME_ID_REQUIRED",
+                    "gameId is required to create a booking");
+        }
+        GameTitle game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new BookingException(HttpStatus.NOT_FOUND, "GAME_NOT_FOUND",
+                        "No game exists with id " + gameId));
+        if (!game.isActive()) {
+            throw new BookingException(HttpStatus.CONFLICT, "GAME_INACTIVE",
+                    "Game '" + game.getTitle() + "' is not currently available");
+        }
+        if (!gameStationRepository.existsByIdAndGames_Id(station.getId(), gameId)) {
+            throw new BookingException(HttpStatus.BAD_REQUEST, "GAME_NOT_ON_STATION",
+                    "Game '" + game.getTitle() + "' is not available on station " + station.getStationCode());
+        }
+        return game;
     }
 
     /** Builds and dispatches the booking-confirmed email. */
@@ -269,6 +292,10 @@ public class BookingServiceImpl implements BookingService {
             throw new BookingException(HttpStatus.CONFLICT, "STATION_INACTIVE",
                     "Station " + station.getStationCode() + " is not currently active");
         }
+        UUID gameId = request.gameId() != null
+                ? request.gameId()
+                : (booking.getGame() != null ? booking.getGame().getId() : null);
+        GameTitle game = validateGameOnStation(station, gameId);
 
         List<Booking> conflicts = bookingRepository.findOverlapping(
                 station.getId(), request.startTime(), request.endTime());
@@ -282,6 +309,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         booking.setStation(station);
+        booking.setGame(game);
         booking.setStartTime(request.startTime());
         booking.setEndTime(request.endTime());
         

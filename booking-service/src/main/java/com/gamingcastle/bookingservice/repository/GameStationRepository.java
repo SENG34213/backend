@@ -9,4 +9,6 @@ import java.util.Optional;
 
 public interface GameStationRepository extends JpaRepository<GameStation, UUID> {
     Optional<GameStation> findByStationCode(String stationCode);
+    boolean existsByIdAndGames_Id(UUID stationId, UUID gameId);
+
 }

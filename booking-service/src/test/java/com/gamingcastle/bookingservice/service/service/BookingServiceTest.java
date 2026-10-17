@@ -10,9 +10,11 @@ import com.gamingcastle.bookingservice.entity.Booking;
 import com.gamingcastle.bookingservice.entity.BookingSource;
 import com.gamingcastle.bookingservice.entity.BookingStatus;
 import com.gamingcastle.bookingservice.entity.GameStation;
+import com.gamingcastle.bookingservice.entity.GameTitle;
 import com.gamingcastle.bookingservice.entity.StationType;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
+import com.gamingcastle.bookingservice.repository.GameRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
 import com.gamingcastle.bookingservice.service.BookingService;
 import com.gamingcastle.bookingservice.service.BookingServiceImpl;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -47,6 +50,7 @@ class BookingServiceTest {
 
     @Mock private BookingRepository bookingRepository;
     @Mock private GameStationRepository gameStationRepository;
+    @Mock private GameRepository gameRepository;
     @Mock private PaymentClient paymentClient;
     @Mock private NotificationClient notificationClient;
     @Mock private LoyaltyClient loyaltyClient;
@@ -55,12 +59,16 @@ class BookingServiceTest {
     private BookingService bookingService;
 
     private GameStation station;
+    private GameTitle game;
+    private UUID gameId;
     private UUID userId;
 
     @BeforeEach
     void setUp() {
+        // NOTE: GameRepository is now the 3rd constructor argument
         bookingService = new BookingServiceImpl(
-                bookingRepository, gameStationRepository, loyaltyClient, paymentClient, notificationClient, userClient);
+                bookingRepository, gameStationRepository, gameRepository,
+                loyaltyClient, paymentClient, notificationClient, userClient);
 
         station = GameStation.builder()
                 .id(UUID.randomUUID())
@@ -69,7 +77,29 @@ class BookingServiceTest {
                 .hourlyRate(BigDecimal.valueOf(300))
                 .active(true)
                 .build();
+
+        gameId = UUID.randomUUID();
+        game = GameTitle.builder()
+                .id(gameId)
+                .title("Tekken 8")
+                .genre("FIGHTING")
+                .platforms("PC")
+                .releaseYear(2024)
+                .ageRating("PEGI_16")
+                .active(true)
+                .build();
+
         userId = UUID.randomUUID();
+    }
+
+    /**
+     * Stubs the "happy path" for game validation: the game exists, is active,
+     * and is installed on the given station. Call this ONLY in tests that get
+     * past the station checks (Mockito strict stubs fail on unused stubs).
+     */
+    private void stubGameOnStation(GameStation targetStation) {
+        when(gameRepository.findById(gameId)).thenReturn(Optional.of(game));
+        when(gameStationRepository.existsByIdAndGames_Id(targetStation.getId(), gameId)).thenReturn(true);
     }
 
     // ── createBooking: Basic & Validation ────────────────────────────────────
@@ -79,9 +109,10 @@ class BookingServiceTest {
     void createBooking_shouldSucceed_givenFreeSlot() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking b = invocation.getArgument(0);
@@ -99,11 +130,36 @@ class BookingServiceTest {
     }
 
     @Test
+    @DisplayName("createBooking: saves the booking with the selected game")
+    void createBooking_shouldSaveBookingWithSelectedGame() {
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
+
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
+        when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking b = invocation.getArgument(0);
+            b.setId(UUID.randomUUID());
+            b.setCreatedAt(Instant.now());
+            return b;
+        });
+
+        bookingService.createBooking(userId, request, BookingSource.WALK_IN);
+
+        ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository, atLeastOnce()).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getGame()).isSameAs(game);
+        assertThat(captor.getAllValues().get(0).getGame().getId()).isEqualTo(gameId);
+    }
+
+    @Test
     @DisplayName("createBooking: rejects overlapping booking")
     void createBooking_shouldReject_givenOverlappingConfirmedBooking() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         Booking existing = Booking.builder()
                 .id(UUID.randomUUID())
@@ -116,6 +172,7 @@ class BookingServiceTest {
                 .build();
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station); // game validation happens BEFORE the overlap check
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
@@ -129,9 +186,10 @@ class BookingServiceTest {
     void createBooking_shouldSucceed_givenAdjacentSlot() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -145,9 +203,10 @@ class BookingServiceTest {
     void createBooking_shouldIgnoreCancelledBookings_becauseRepositoryQueryFiltersThemOut() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -163,7 +222,7 @@ class BookingServiceTest {
         UUID unknownStationId = UUID.randomUUID();
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(unknownStationId, start, end);
+        BookingRequest request = new BookingRequest(unknownStationId, gameId, start, end);
 
         when(gameStationRepository.findById(unknownStationId)).thenReturn(Optional.empty());
 
@@ -172,6 +231,7 @@ class BookingServiceTest {
                 .hasMessageContaining("No game station exists");
         verify(bookingRepository, never()).findOverlapping(any(), any(), any());
         verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(gameRepository);
     }
 
     @Test
@@ -180,7 +240,7 @@ class BookingServiceTest {
         station.setActive(false);
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
 
@@ -201,12 +261,107 @@ class BookingServiceTest {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.minus(1, ChronoUnit.HOURS);
 
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
                 .isInstanceOf(BookingException.class)
                 .hasMessageContaining("endTime must be after startTime");
         verifyNoInteractions(gameStationRepository);
+        verifyNoInteractions(gameRepository);
+    }
+
+    // ── createBooking: Game validation ───────────────────────────────────────
+
+    @Test
+    @DisplayName("createBooking: throws 400 GAME_ID_REQUIRED when gameId is missing")
+    void createBooking_shouldThrowBadRequest_whenGameIdMissing() {
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), null, start, end);
+
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> {
+                    BookingException be = (BookingException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(be.getErrorCode()).isEqualTo("GAME_ID_REQUIRED");
+                });
+
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(paymentClient);
+    }
+
+    @Test
+    @DisplayName("createBooking: throws 404 GAME_NOT_FOUND when game does not exist")
+    void createBooking_shouldThrowNotFound_whenGameDoesNotExist() {
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
+
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        when(gameRepository.findById(gameId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> {
+                    BookingException be = (BookingException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+                    assertThat(be.getErrorCode()).isEqualTo("GAME_NOT_FOUND");
+                });
+
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(paymentClient);
+    }
+
+    @Test
+    @DisplayName("createBooking: throws 409 GAME_INACTIVE when game is inactive")
+    void createBooking_shouldThrowConflict_whenGameInactive() {
+        game.setActive(false);
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
+
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        when(gameRepository.findById(gameId)).thenReturn(Optional.of(game));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> {
+                    BookingException be = (BookingException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(be.getErrorCode()).isEqualTo("GAME_INACTIVE");
+                });
+
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(paymentClient);
+    }
+
+    @Test
+    @DisplayName("createBooking: throws 400 GAME_NOT_ON_STATION when game is not installed on the station")
+    void createBooking_shouldThrowBadRequest_whenGameNotOnStation() {
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
+
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        when(gameRepository.findById(gameId)).thenReturn(Optional.of(game));
+        when(gameStationRepository.existsByIdAndGames_Id(station.getId(), gameId)).thenReturn(false);
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request, BookingSource.ONLINE))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> {
+                    BookingException be = (BookingException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(be.getErrorCode()).isEqualTo("GAME_NOT_ON_STATION");
+                    assertThat(be.getMessage()).contains("PC-01");
+                });
+
+        // nothing should be created / charged when the game isn't on the station
+        verify(bookingRepository, never()).findOverlapping(any(), any(), any());
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(paymentClient);
     }
 
     // ── createBooking: ONLINE Payment & Notifications ────────────────────────
@@ -216,13 +371,14 @@ class BookingServiceTest {
     void createBooking_shouldSucceedOnline_whenPaymentSucceeds() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(2, ChronoUnit.HOURS); // 2 hours * 300 = 600.00
-        BookingRequest request = new BookingRequest(station.getId(), start, end, "CARD", 50);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end, "CARD", 50);
 
         UUID paymentId = UUID.randomUUID();
         PaymentClient.PaymentResult paymentResult = new PaymentClient.PaymentResult(
                 paymentId, BigDecimal.valueOf(600), BigDecimal.valueOf(50), BigDecimal.valueOf(550));
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking b = invocation.getArgument(0);
@@ -254,13 +410,14 @@ class BookingServiceTest {
     void createBooking_shouldSkipEmail_whenUserEmailBlankOrMissing() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         UUID paymentId = UUID.randomUUID();
         PaymentClient.PaymentResult paymentResult = new PaymentClient.PaymentResult(
                 paymentId, BigDecimal.valueOf(300), BigDecimal.ZERO, BigDecimal.valueOf(300));
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(paymentClient.chargeBookingFee(any(), any(), any(), any(), any())).thenReturn(paymentResult);
@@ -279,13 +436,14 @@ class BookingServiceTest {
     void createBooking_shouldNotRollback_whenNotificationFails() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         UUID paymentId = UUID.randomUUID();
         PaymentClient.PaymentResult paymentResult = new PaymentClient.PaymentResult(
                 paymentId, BigDecimal.valueOf(300), BigDecimal.ZERO, BigDecimal.valueOf(300));
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking b = invocation.getArgument(0);
@@ -311,9 +469,10 @@ class BookingServiceTest {
     void createBooking_shouldMarkCancelled_whenPaymentClientThrowsBookingException() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -333,9 +492,10 @@ class BookingServiceTest {
     void createBooking_shouldMarkCancelled_whenPaymentResultIsNull() {
         Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, end);
 
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(paymentClient.chargeBookingFee(any(), any(), any(), any(), any())).thenReturn(null);
@@ -360,6 +520,7 @@ class BookingServiceTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -384,6 +545,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -407,6 +569,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(otherUserId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -442,6 +605,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(otherUserId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -466,6 +630,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CANCELLED)
@@ -491,6 +656,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.HOURS))
                 .endTime(Instant.now().plus(2, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -519,6 +685,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(oldStart)
                 .endTime(oldEnd)
                 .status(BookingStatus.CONFIRMED)
@@ -526,10 +693,11 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.plus(2, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), newStart, newEnd);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, newStart, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), newStart, newEnd)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -538,6 +706,78 @@ class BookingServiceTest {
         assertThat(response.startTime()).isEqualTo(newStart);
         assertThat(response.endTime()).isEqualTo(newEnd);
         verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    @DisplayName("rescheduleBooking: falls back to the booking's existing game when request has no gameId")
+    void rescheduleBooking_shouldUseExistingGame_whenRequestGameIdIsNull() {
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .game(game) // existing game on the booking
+                .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
+        Instant newEnd = newStart.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(station.getId(), null, newStart, newEnd);
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station); // validated using booking.getGame().getId()
+        when(bookingRepository.findOverlapping(station.getId(), newStart, newEnd)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        bookingService.rescheduleBooking(bookingId, userId, false, request);
+
+        assertThat(booking.getGame()).isSameAs(game);
+        verify(gameRepository).findById(gameId);
+    }
+
+    @Test
+    @DisplayName("rescheduleBooking: throws 400 GAME_NOT_ON_STATION when game is not on the new station")
+    void rescheduleBooking_shouldThrowBadRequest_whenGameNotOnTargetStation() {
+        UUID bookingId = UUID.randomUUID();
+        GameStation otherStation = GameStation.builder()
+                .id(UUID.randomUUID())
+                .stationCode("CONSOLE-01")
+                .type(StationType.CONSOLE)
+                .hourlyRate(BigDecimal.valueOf(400))
+                .active(true)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .game(game)
+                .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
+        Instant newEnd = newStart.plus(1, ChronoUnit.HOURS);
+        BookingRequest request = new BookingRequest(otherStation.getId(), gameId, newStart, newEnd);
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(gameStationRepository.findById(otherStation.getId())).thenReturn(Optional.of(otherStation));
+        when(gameRepository.findById(gameId)).thenReturn(Optional.of(game));
+        when(gameStationRepository.existsByIdAndGames_Id(otherStation.getId(), gameId)).thenReturn(false);
+
+        assertThatThrownBy(() -> bookingService.rescheduleBooking(bookingId, userId, false, request))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> {
+                    BookingException be = (BookingException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(be.getErrorCode()).isEqualTo("GAME_NOT_ON_STATION");
+                });
+
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -551,6 +791,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(otherUserId)
                 .station(station)
+                .game(game)
                 .startTime(oldStart)
                 .endTime(oldEnd)
                 .status(BookingStatus.CONFIRMED)
@@ -558,10 +799,11 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.plus(2, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), newStart, newEnd);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, newStart, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), newStart, newEnd)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -574,7 +816,9 @@ class BookingServiceTest {
     @DisplayName("rescheduleBooking: throws 404 when booking does not exist")
     void rescheduleBooking_shouldThrowNotFound_whenBookingDoesNotExist() {
         UUID bookingId = UUID.randomUUID();
-        BookingRequest request = new BookingRequest(station.getId(), Instant.now().plus(2, ChronoUnit.DAYS), Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
+        BookingRequest request = new BookingRequest(station.getId(), gameId,
+                Instant.now().plus(2, ChronoUnit.DAYS),
+                Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.empty());
 
@@ -591,12 +835,15 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(UUID.randomUUID())
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
-        BookingRequest request = new BookingRequest(station.getId(), Instant.now().plus(3, ChronoUnit.DAYS), Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
+        BookingRequest request = new BookingRequest(station.getId(), gameId,
+                Instant.now().plus(3, ChronoUnit.DAYS),
+                Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
@@ -613,12 +860,15 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.PENDING)
                 .build();
 
-        BookingRequest request = new BookingRequest(station.getId(), Instant.now().plus(3, ChronoUnit.DAYS), Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
+        BookingRequest request = new BookingRequest(station.getId(), gameId,
+                Instant.now().plus(3, ChronoUnit.DAYS),
+                Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
@@ -639,12 +889,15 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.HOURS))
                 .endTime(Instant.now().plus(2, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
-        BookingRequest request = new BookingRequest(station.getId(), Instant.now().plus(3, ChronoUnit.DAYS), Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
+        BookingRequest request = new BookingRequest(station.getId(), gameId,
+                Instant.now().plus(3, ChronoUnit.DAYS),
+                Instant.now().plus(3, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS));
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
@@ -665,6 +918,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -672,7 +926,7 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.minus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), newStart, newEnd);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, newStart, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
@@ -694,6 +948,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -701,7 +956,7 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(targetStationId, newStart, newEnd);
+        BookingRequest request = new BookingRequest(targetStationId, gameId, newStart, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(targetStationId)).thenReturn(Optional.empty());
@@ -727,6 +982,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -734,7 +990,7 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(inactiveStation.getId(), newStart, newEnd);
+        BookingRequest request = new BookingRequest(inactiveStation.getId(), gameId, newStart, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(inactiveStation.getId())).thenReturn(Optional.of(inactiveStation));
@@ -752,6 +1008,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(2, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(2, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
@@ -759,7 +1016,7 @@ class BookingServiceTest {
 
         Instant newStart = Instant.now().plus(3, ChronoUnit.DAYS);
         Instant newEnd = newStart.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), newStart, newEnd);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, newStart, newEnd);
 
         Booking otherBooking = Booking.builder()
                 .id(UUID.randomUUID()) // different ID
@@ -770,6 +1027,7 @@ class BookingServiceTest {
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station); // game validation happens BEFORE the overlap check
         when(bookingRepository.findOverlapping(station.getId(), newStart, newEnd)).thenReturn(List.of(otherBooking));
 
         assertThatThrownBy(() -> bookingService.rescheduleBooking(bookingId, userId, false, request))
@@ -787,6 +1045,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(start)
                 .endTime(end)
                 .status(BookingStatus.CONFIRMED)
@@ -794,10 +1053,11 @@ class BookingServiceTest {
 
         // Reschedule slightly extending the slot on same station
         Instant newEnd = end.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, newEnd);
+        BookingRequest request = new BookingRequest(station.getId(), gameId, start, newEnd);
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(gameStationRepository.findById(station.getId())).thenReturn(Optional.of(station));
+        stubGameOnStation(station);
         when(bookingRepository.findOverlapping(station.getId(), start, newEnd)).thenReturn(List.of(booking)); // only self in conflict
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -843,6 +1103,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED) // already confirmed
@@ -868,6 +1129,7 @@ class BookingServiceTest {
                 .id(bookingId)
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
                 .endTime(Instant.now().plus(1, ChronoUnit.DAYS).plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.PENDING)
@@ -894,6 +1156,7 @@ class BookingServiceTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .station(station)
+                .game(game)
                 .startTime(Instant.now())
                 .endTime(Instant.now().plus(1, ChronoUnit.HOURS))
                 .status(BookingStatus.CONFIRMED)
