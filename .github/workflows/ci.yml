@@ -50,6 +50,7 @@ jobs:
           - payment-service
           - tournament-service
           - loyalty-service
+          - notification-service
     services:
       postgres:
         image: postgres:16
