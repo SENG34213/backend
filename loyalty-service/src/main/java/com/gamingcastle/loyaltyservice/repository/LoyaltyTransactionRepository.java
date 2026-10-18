@@ -38,7 +38,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
             Instant cutoff
     );
 
-    @Query("select coalesce(sum(t.points), 0) from LoyaltyTransaction t where t.type = 'REDEEM' and t.status = 'COMPLETED'")
+    @Query("select coalesce(sum(t.points), 0) from LoyaltyTransaction t where t.type = com.gamingcastle.loyaltyservice.entity.LoyaltyTransactionType.REDEEMED and t.status = com.gamingcastle.loyaltyservice.entity.LoyaltyTransactionStatus.CONFIRMED")
     long sumRedeemedPoints();
 
     Page<LoyaltyTransaction> findAll(Pageable pageable);

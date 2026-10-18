@@ -6,6 +6,7 @@ import com.gamingcastle.loyaltyservice.dto.request.CalculateRedemptionRequest;
 import com.gamingcastle.loyaltyservice.dto.request.RedeemPointsRequest;
 import com.gamingcastle.loyaltyservice.dto.request.UpdateLoyaltyRulesRequest;
 import com.gamingcastle.loyaltyservice.dto.response.AdminAdjustmentResponse;
+import com.gamingcastle.loyaltyservice.dto.response.AdminLoyaltyStatsResponse;
 import com.gamingcastle.loyaltyservice.dto.response.AwardPointsResponse;
 import com.gamingcastle.loyaltyservice.dto.response.CalculationResponse;
 import com.gamingcastle.loyaltyservice.dto.response.LoyaltyAccountResponse;
@@ -515,10 +516,148 @@ class LoyaltyServiceTest {
     void findExpiredReservationBookingIds_shouldReturnBookingsWithOldPendingReservations() {
         LoyaltyTransaction old = transaction(LoyaltyTransactionType.REDEEMED,
                 LoyaltyTransactionStatus.PENDING, 100, "50.00");
+        LoyaltyTransaction withoutBooking = LoyaltyTransaction.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .bookingId(null)
+                .type(LoyaltyTransactionType.REDEEMED)
+                .status(LoyaltyTransactionStatus.PENDING)
+                .points(50)
+                .build();
         when(transactionRepository.findByTypeAndStatusAndCreatedAtBefore(
                 eq(LoyaltyTransactionType.REDEEMED), eq(LoyaltyTransactionStatus.PENDING), any(Instant.class)))
-                .thenReturn(List.of(old));
+                .thenReturn(List.of(old, withoutBooking));
 
         assertThat(service.findExpiredReservationBookingIds()).containsExactly(BOOKING_ID);
     }
-}
+
+    @Test
+    void getLoyaltyStats_shouldAggregateAccountsAndTransactionsByTier() {
+        when(accountRepository.count()).thenReturn(15L);
+        when(accountRepository.sumPointsBalance()).thenReturn(4500L);
+        when(accountRepository.sumLifetimeEarned()).thenReturn(12000L);
+        when(transactionRepository.sumRedeemedPoints()).thenReturn(7500L);
+        when(accountRepository.countByTier(LoyaltyTier.BRONZE)).thenReturn(10L);
+        when(accountRepository.countByTier(LoyaltyTier.SILVER)).thenReturn(4L);
+        when(accountRepository.countByTier(LoyaltyTier.GOLD)).thenReturn(1L);
+
+        AdminLoyaltyStatsResponse stats = service.getLoyaltyStats();
+
+        assertThat(stats.totalAccounts()).isEqualTo(15L);
+        assertThat(stats.totalPointsInCirculation()).isEqualTo(4500L);
+        assertThat(stats.totalPointsAwardedAllTime()).isEqualTo(12000L);
+        assertThat(stats.totalPointsRedeemedAllTime()).isEqualTo(7500L);
+        assertThat(stats.accountsByTier())
+                .containsEntry("BRONZE", 10L)
+                .containsEntry("SILVER", 4L)
+                .containsEntry("GOLD", 1L);
+    }
+
+    @Test
+    void getAllAccounts_shouldReturnPagedAccountsWithLkrDiscountCalculated() {
+        LoyaltyAccount acc1 = LoyaltyAccount.builder()
+                .userId(USER_ID)
+                .pointsBalance(200L)
+                .lifetimeEarned(500L)
+                .tier(LoyaltyTier.BRONZE)
+                .build();
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(accountRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(acc1)));
+
+        Page<LoyaltyAccountResponse> page = service.getAllAccounts(pageable);
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        LoyaltyAccountResponse item = page.getContent().get(0);
+        assertThat(item.userId()).isEqualTo(USER_ID);
+        assertThat(item.pointsBalance()).isEqualTo(200L);
+        assertThat(item.equivalentDiscount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void getAllTransactions_shouldReturnPagedTransactionsSortedDesc() {
+        LoyaltyTransaction tx = transaction(LoyaltyTransactionType.EARNED, LoyaltyTransactionStatus.CONFIRMED, 50, "0.00");
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(transactionRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(tx)));
+
+        Page<TransactionHistoryResponse> page = service.getAllTransactions(pageable);
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).points()).isEqualTo(50L);
+    }
+
+    @Test
+    void calculateRedemption_shouldThrowInvalidLoyaltyRequest_whenBookingTotalIsZeroOrNegative() {
+        CalculateRedemptionRequest reqZero = new CalculateRedemptionRequest(USER_ID, BigDecimal.ZERO, 100);
+        CalculateRedemptionRequest reqNegative = new CalculateRedemptionRequest(USER_ID, new BigDecimal("-10.00"), 100);
+
+        assertThatThrownBy(() -> service.calculateRedemption(reqZero))
+                .isInstanceOf(InvalidLoyaltyRequestException.class)
+                .hasMessageContaining("bookingTotal must be greater than zero");
+
+        assertThatThrownBy(() -> service.calculateRedemption(reqNegative))
+                .isInstanceOf(InvalidLoyaltyRequestException.class)
+                .hasMessageContaining("bookingTotal must be greater than zero");
+    }
+
+    @Test
+    void reserveRedemption_shouldThrowInvalidLoyaltyRequest_whenBookingAlreadyReservedByAnotherUser() {
+        UUID otherUser = UUID.randomUUID();
+        LoyaltyTransaction existing = LoyaltyTransaction.builder()
+                .id(UUID.randomUUID())
+                .userId(otherUser)
+                .bookingId(BOOKING_ID)
+                .type(LoyaltyTransactionType.REDEEMED)
+                .status(LoyaltyTransactionStatus.PENDING)
+                .points(100)
+                .build();
+        when(transactionRepository.findFirstByBookingIdAndTypeAndStatusInOrderByCreatedAtDesc(
+                eq(BOOKING_ID), eq(LoyaltyTransactionType.REDEEMED), any()))
+                .thenReturn(Optional.of(existing));
+        givenAccount(200, 200, LoyaltyTier.BRONZE);
+
+        RedeemPointsRequest request = new RedeemPointsRequest(USER_ID, BOOKING_ID, new BigDecimal("1000.00"), 100);
+        assertThatThrownBy(() -> service.reserveRedemption(request))
+                .isInstanceOf(InvalidLoyaltyRequestException.class)
+                .hasMessageContaining("already has a redemption for another user");
+    }
+
+    @Test
+    void confirmRedemption_shouldReturnConfirmed_whenReservationAlreadyConfirmed() {
+        when(transactionRepository.findByBookingIdAndTypeAndStatus(
+                BOOKING_ID, LoyaltyTransactionType.REDEEMED, LoyaltyTransactionStatus.PENDING))
+                .thenReturn(Optional.empty());
+
+        LoyaltyTransaction confirmed = transaction(LoyaltyTransactionType.REDEEMED,
+                LoyaltyTransactionStatus.CONFIRMED, 100, "50.00");
+        when(transactionRepository.findByBookingIdAndTypeAndStatus(
+                BOOKING_ID, LoyaltyTransactionType.REDEEMED, LoyaltyTransactionStatus.CONFIRMED))
+                .thenReturn(Optional.of(confirmed));
+        givenAccount(50, 50, LoyaltyTier.BRONZE);
+
+        LoyaltyStatusResponse response = service.confirmRedemption(BOOKING_ID);
+
+        assertThat(response.status()).isEqualTo("CONFIRMED");
+        assertThat(response.pointsRedeemed()).isEqualTo(100L);
+    }
+
+    @Test
+    void reverseBooking_shouldDowngradeTier_whenReversalReducesLifetimePoints() {
+        LoyaltyAccount account = givenAccount(1500, 1500, LoyaltyTier.SILVER);
+        LoyaltyTransaction earned = transaction(LoyaltyTransactionType.EARNED, LoyaltyTransactionStatus.CONFIRMED, 600, "0.00");
+        when(transactionRepository.findByBookingIdAndTypeAndStatus(
+                BOOKING_ID, LoyaltyTransactionType.EARNED, LoyaltyTransactionStatus.CONFIRMED))
+                .thenReturn(Optional.of(earned));
+        when(transactionRepository.findFirstByBookingIdAndTypeAndStatusInOrderByCreatedAtDesc(
+                eq(BOOKING_ID), eq(LoyaltyTransactionType.REDEEMED), any()))
+                .thenReturn(Optional.empty());
+        when(transactionRepository.existsByBookingIdAndType(BOOKING_ID, LoyaltyTransactionType.EARN_REVERSED))
+                .thenReturn(false);
+
+        ReverseLoyaltyResponse response = service.reverseBooking(BOOKING_ID, "Cancelled order");
+
+        assertThat(response.earnedPointsReversed()).isEqualTo(600L);
+        assertThat(account.getPointsBalance()).isEqualTo(900L);
+        assertThat(account.getLifetimeEarned()).isEqualTo(900L);
+        assertThat(account.getTier()).isEqualTo(LoyaltyTier.BRONZE);
+    }
+}

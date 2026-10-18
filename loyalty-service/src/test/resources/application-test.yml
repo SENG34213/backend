@@ -1,0 +1,29 @@
+# Test environment configuration for loyalty-service
+# Active during automated integration tests (@ActiveProfiles("test") or SPRING_PROFILES_ACTIVE=test)
+
+spring:
+  application:
+    name: loyalty-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_loyalty_test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:Arivu1123}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: Asia/Colombo
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:test-gateway-internal-secret}
+
+eureka:
+  client:
+    enabled: false
