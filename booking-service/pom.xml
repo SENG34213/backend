@@ -183,7 +183,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.60</minimum>
+                                            <minimum>${jacoco.minimum}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
