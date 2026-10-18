@@ -176,6 +176,13 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<RegistrationResponse> getRegistrationsForUser(UUID userId) {
+        return registrationRepository.findByUserId(userId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     // processEntryFeePayment stub removed — real payment handled by PaymentClient.chargeEntryFee()
 
     private RegistrationResponse mapToResponse(TournamentRegistration r) {

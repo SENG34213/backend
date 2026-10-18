@@ -100,6 +100,14 @@ public class TournamentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /** FR-14, UC-08: Customer views their own tournament registrations. */
+    @GetMapping("/my-registrations")
+    public ResponseEntity<List<RegistrationResponse>> getMyRegistrations(
+            @RequestHeader("X-User-Id") UUID userId
+    ) {
+        return ResponseEntity.ok(registrationService.getRegistrationsForUser(userId));
+    }
+
     /** FR-15, UC-09 step 4: Admin monitors registrations in real time. */
     @GetMapping("/{id}/registrations")
     @PreAuthorize("hasRole('ADMIN')")
