@@ -1,0 +1,47 @@
+# Test environment configuration for notification-service
+# Active during automated tests (@ActiveProfiles("test") or SPRING_PROFILES_ACTIVE=test)
+
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_notification_test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:Arivu1123}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: Asia/Colombo
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    enabled: false
+
+gateway:
+  internal-secret: test-gateway-internal-secret
+
+jwt:
+  secret: test-jwt-secret-key-that-is-at-least-32-bytes-long!
+  expiration-ms: 900000
+
+socket:
+  notification:
+    url: http://localhost:5001/api/notify
+
+twilio:
+  account-sid: ACmockaccount123456789012345678
+  auth-token: mocktoken123456789012345678
+  from-number: "+1234567890"
+  default-country-code: "+94"
+
+app:
+  mail:
+    from: noreply@gamingcastle.com

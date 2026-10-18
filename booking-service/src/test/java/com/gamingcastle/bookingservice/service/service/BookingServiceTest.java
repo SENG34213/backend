@@ -4,6 +4,8 @@ import com.gamingcastle.bookingservice.client.LoyaltyClient;
 import com.gamingcastle.bookingservice.client.NotificationClient;
 import com.gamingcastle.bookingservice.client.PaymentClient;
 import com.gamingcastle.bookingservice.client.UserClient;
+import com.gamingcastle.bookingservice.dto.AdminBookingRow;
+import com.gamingcastle.bookingservice.dto.AdminBookingStatsResponse;
 import com.gamingcastle.bookingservice.dto.BookingRequest;
 import com.gamingcastle.bookingservice.dto.BookingResponse;
 import com.gamingcastle.bookingservice.entity.Booking;
@@ -922,5 +924,152 @@ class BookingServiceTest {
         assertThat(responses.getContent()).isEmpty();
         verify(bookingRepository).findAll(pageable);
         verify(bookingRepository, never()).findByStatus(any(), any());
+    }
+
+    // ── Admin Bookings, Stats, and Export ─────────────────────────────────────
+
+    @Test
+    @DisplayName("getAdminBookings: returns mapped admin booking rows and builds specification")
+    @SuppressWarnings("unchecked")
+    void getAdminBookings_shouldReturnRows_andExerciseSpec() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Instant now = Instant.now();
+        Instant end = now.plus(2, ChronoUnit.HOURS);
+
+        Booking bookingWithStation = Booking.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .station(station)
+                .startTime(now)
+                .endTime(end)
+                .status(BookingStatus.CONFIRMED)
+                .source(BookingSource.ONLINE)
+                .paymentId(UUID.randomUUID())
+                .createdAt(now)
+                .build();
+
+        Booking bookingWithoutStation = Booking.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .station(null)
+                .startTime(now)
+                .endTime(end)
+                .status(BookingStatus.PENDING)
+                .source(BookingSource.WALK_IN)
+                .paymentId(null)
+                .createdAt(now)
+                .build();
+
+        GameStation stationWithoutTypeOrRate = GameStation.builder()
+                .id(UUID.randomUUID())
+                .stationCode("PS5-99")
+                .type(null)
+                .hourlyRate(null)
+                .active(true)
+                .build();
+
+        Booking bookingWithNullTypeAndRate = Booking.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .station(stationWithoutTypeOrRate)
+                .startTime(now)
+                .endTime(end)
+                .status(BookingStatus.PENDING)
+                .source(BookingSource.WALK_IN)
+                .paymentId(null)
+                .createdAt(now)
+                .build();
+
+        Page<Booking> page = new PageImpl<>(List.of(bookingWithStation, bookingWithoutStation, bookingWithNullTypeAndRate));
+        when(bookingRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable))).thenReturn(page);
+
+        Page<AdminBookingRow> result = bookingService.getAdminBookings(
+                BookingStatus.CONFIRMED,
+                BookingSource.ONLINE,
+                userId,
+                station.getId(),
+                now,
+                end,
+                pageable
+        );
+
+        assertThat(result.getContent()).hasSize(3);
+        AdminBookingRow row1 = result.getContent().get(0);
+        assertThat(row1.stationCode()).isEqualTo("PC-01");
+        assertThat(row1.stationType()).isEqualTo("PC");
+        assertThat(row1.payableAmount()).isGreaterThan(BigDecimal.ZERO);
+
+        AdminBookingRow row2 = result.getContent().get(1);
+        assertThat(row2.stationCode()).isNull();
+        assertThat(row2.payableAmount()).isEqualTo(BigDecimal.ZERO);
+
+        AdminBookingRow row3 = result.getContent().get(2);
+        assertThat(row3.stationCode()).isEqualTo("PS5-99");
+        assertThat(row3.stationType()).isNull();
+        assertThat(row3.hourlyRate()).isNull();
+
+        // Exercise the Specification lambda (Predicate creation)
+        org.mockito.ArgumentCaptor<org.springframework.data.jpa.domain.Specification<Booking>> captor =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+        verify(bookingRepository).findAll(captor.capture(), eq(pageable));
+
+        jakarta.persistence.criteria.Root<Booking> root = mock(jakarta.persistence.criteria.Root.class);
+        jakarta.persistence.criteria.CriteriaQuery<?> query = mock(jakarta.persistence.criteria.CriteriaQuery.class);
+        jakarta.persistence.criteria.CriteriaBuilder cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class);
+        jakarta.persistence.criteria.Path path = mock(jakarta.persistence.criteria.Path.class);
+
+        when(root.get(anyString())).thenReturn(path);
+        when(path.get(anyString())).thenReturn(path);
+
+        captor.getValue().toPredicate(root, query, cb);
+        verify(cb, atLeastOnce()).and(any(jakarta.persistence.criteria.Predicate[].class));
+    }
+
+    @Test
+    @DisplayName("getBookingStats: calculates aggregate statistics")
+    void getBookingStats_shouldReturnAggregatedStats() {
+        when(bookingRepository.countByCreatedAtBetween(any(Instant.class), any(Instant.class))).thenReturn(15L);
+        when(bookingRepository.countByStatusAndCreatedAtBetween(eq(BookingStatus.CONFIRMED), any(Instant.class), any(Instant.class))).thenReturn(10L);
+        when(bookingRepository.countByStatusAndCreatedAtBetween(eq(BookingStatus.CANCELLED), any(Instant.class), any(Instant.class))).thenReturn(2L);
+        when(bookingRepository.countActiveSessionsAt(any(Instant.class))).thenReturn(4L);
+        when(bookingRepository.count()).thenReturn(100L);
+        when(bookingRepository.countByStatus(BookingStatus.CANCELLED)).thenReturn(12L);
+
+        AdminBookingStatsResponse stats = bookingService.getBookingStats();
+
+        assertThat(stats.todayTotalBookings()).isEqualTo(15L);
+        assertThat(stats.todayConfirmedBookings()).isEqualTo(10L);
+        assertThat(stats.todayCancelledBookings()).isEqualTo(2L);
+        assertThat(stats.activeSessionsNow()).isEqualTo(4L);
+        assertThat(stats.allTimeTotalBookings()).isEqualTo(100L);
+        assertThat(stats.allTimeCancelled()).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("getBookingsForExport: returns list of admin booking rows for export")
+    @SuppressWarnings("unchecked")
+    void getBookingsForExport_shouldReturnList() {
+        Instant now = Instant.now();
+        Instant end = now.plus(1, ChronoUnit.HOURS);
+        Booking booking = Booking.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .station(station)
+                .startTime(now)
+                .endTime(end)
+                .status(BookingStatus.CONFIRMED)
+                .source(BookingSource.ONLINE)
+                .createdAt(now)
+                .build();
+
+        Page<Booking> page = new PageImpl<>(List.of(booking));
+        when(bookingRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class))).thenReturn(page);
+
+        List<AdminBookingRow> exportRows = bookingService.getBookingsForExport(
+                null, null, null, null, null, null
+        );
+
+        assertThat(exportRows).hasSize(1);
+        assertThat(exportRows.get(0).stationCode()).isEqualTo("PC-01");
     }
 }
