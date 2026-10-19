@@ -8,4 +8,5 @@ public interface RegistrationService {
     RegistrationResponse registerForTournament(UUID tournamentId, UUID userId);
     RegistrationResponse registerForTournament(UUID tournamentId, UUID userId, String email, String fullName);
     List<RegistrationResponse> getRegistrationsForTournament(UUID tournamentId);
+    List<RegistrationResponse> getRegistrationsForUser(UUID userId);
 }
