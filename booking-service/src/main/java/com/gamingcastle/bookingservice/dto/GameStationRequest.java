@@ -17,5 +17,10 @@ public record GameStationRequest(
     @DecimalMin(value = "0.0", inclusive = false, message = "Hourly rate must be greater than zero")
     BigDecimal hourlyRate,
     
-    boolean active
-) {}
+    boolean active,
+    String imageUrl
+) {
+    public GameStationRequest(String stationCode, StationType type, BigDecimal hourlyRate, boolean active) {
+        this(stationCode, type, hourlyRate, active, null);
+    }
+}

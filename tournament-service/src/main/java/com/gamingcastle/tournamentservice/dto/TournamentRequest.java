@@ -15,5 +15,18 @@ public record TournamentRequest(
         Instant endDate,
         @NotNull @DecimalMin("0.0") BigDecimal entryFee,
         @Min(2) int maxParticipants,
-        @NotNull @Future Instant registrationDeadline
-) {}
+        @NotNull @Future Instant registrationDeadline,
+        String imageUrl
+) {
+    public TournamentRequest(
+            String name,
+            String gameTitle,
+            Instant startDate,
+            Instant endDate,
+            BigDecimal entryFee,
+            int maxParticipants,
+            Instant registrationDeadline
+    ) {
+        this(name, gameTitle, startDate, endDate, entryFee, maxParticipants, registrationDeadline, null);
+    }
+}
