@@ -139,6 +139,14 @@ public class NotificationService {
                 NotificationType.TOURNAMENT_RESULTS_PUBLISHED,
                 emailTemplateService.createTournamentResultsEmail(request)
         );
+        socketNotificationBroadcaster.broadcast(
+                "TOURNAMENT_RESULTS",
+                "TOURNAMENT",
+                "Tournament Results Published 🏆",
+                "Final results for " + request.tournamentName() + " (" + request.gameTitle() + ") are now live!",
+                null,
+                "/tournaments"
+        );
     }
 
     public void sendTournamentReminderEmail(TournamentReminderEmailRequest request) {
@@ -146,6 +154,21 @@ public class NotificationService {
                 request.email(),
                 NotificationType.TOURNAMENT_REMINDER,
                 emailTemplateService.createTournamentReminderEmail(request)
+        );
+        String details = "Reminder: " + request.tournamentName() + " (" + request.gameTitle() + ")";
+        if (request.roundInfo() != null && !request.roundInfo().isBlank()) {
+            details += " - " + request.roundInfo();
+        }
+        if (request.opponentName() != null && !request.opponentName().isBlank()) {
+            details += " vs " + request.opponentName();
+        }
+        socketNotificationBroadcaster.broadcast(
+                "MATCH_REMINDER",
+                "TOURNAMENT",
+                "Match Starting Soon ⚡",
+                details,
+                null,
+                "/tournaments"
         );
     }
 
