@@ -24,6 +24,7 @@ public final class APIEndPoints {
     // ---- user endpoints ----
     public static final String users = "/users";
     public static final String profile = users + "/me";
+    public static final String profileAlias = users + "/profile";
     public static final String userById = users + id;
     public static final String deactivateMe = profile + "/deactivate";    // PATCH: user deactivates own account
     public static final String deactivateUser = userById + "/deactivate"; // PATCH: admin deactivates a user

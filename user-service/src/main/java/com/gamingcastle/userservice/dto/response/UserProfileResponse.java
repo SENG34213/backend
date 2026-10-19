@@ -8,5 +8,10 @@ public record UserProfileResponse(
         String email,
         String fullName,
         String phoneNumber,
-        String role
-) {}
+        String role,
+        String avatarUrl
+) {
+    public UserProfileResponse(UUID id, String email, String fullName, String phoneNumber, String role) {
+        this(id, email, fullName, phoneNumber, role, null);
+    }
+}
