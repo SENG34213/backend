@@ -189,8 +189,11 @@ public class PaymentServiceImpl implements PaymentService {
             return toResponse(payment);
         }
 
-        if ("CUSTOMER".equals(role) && !payment.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("You are not authorized to access this payment");
+        if ("CUSTOMER".equals(role)) {
+            if (!payment.getUserId().equals(userId)) {
+                throw new IllegalArgumentException("You are not authorized to access this payment");
+            }
+            return toResponse(payment);
         }
 
         throw new IllegalArgumentException("You are not authorized to access this payment");
