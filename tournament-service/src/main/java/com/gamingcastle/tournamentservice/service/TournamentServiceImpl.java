@@ -3,6 +3,7 @@ package com.gamingcastle.tournamentservice.service;
 import com.gamingcastle.tournamentservice.dto.TournamentRequest;
 import com.gamingcastle.tournamentservice.dto.TournamentResponse;
 import com.gamingcastle.tournamentservice.dto.TournamentStatusUpdateRequest;
+import com.gamingcastle.tournamentservice.dto.TournamentUpdateRequest;
 import com.gamingcastle.tournamentservice.entity.*;
 import com.gamingcastle.tournamentservice.exception.TournamentNotFoundException;
 import com.gamingcastle.tournamentservice.repository.TournamentRepository;
@@ -78,6 +79,49 @@ public class TournamentServiceImpl implements TournamentService {
         Tournament tournament = tournamentRepository.findById(id)
                 .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + id));
         return mapToResponse(tournament);
+    }
+
+    @Override
+    @Transactional
+    public TournamentResponse updateTournament(UUID id, TournamentUpdateRequest request) {
+        Tournament tournament = tournamentRepository.findById(id)
+                .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + id));
+
+        if (tournament.getStatus() == TournamentStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot update a cancelled tournament");
+        }
+        if (tournament.getStatus() == TournamentStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot update a completed tournament");
+        }
+
+        if (request.maxParticipants() < tournament.getParticipantCount()) {
+            throw new IllegalArgumentException(
+                    "Maximum participants (" + request.maxParticipants() +
+                    ") cannot be less than enrolled participants (" + tournament.getParticipantCount() + ")"
+            );
+        }
+
+        if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
+            throw new IllegalArgumentException("End date cannot be earlier than start date");
+        }
+
+        if (request.registrationDeadline().isAfter(request.startDate())) {
+            throw new IllegalArgumentException("Registration deadline cannot be after tournament start date");
+        }
+
+        tournament.setName(request.name().trim());
+        tournament.setGameTitle(request.gameTitle().trim());
+        tournament.setStartDate(request.startDate());
+        tournament.setEndDate(request.endDate());
+        tournament.setEntryFee(request.entryFee());
+        tournament.setMaxParticipants(request.maxParticipants());
+        tournament.setRegistrationDeadline(request.registrationDeadline());
+        if (request.imageUrl() != null) {
+            tournament.setImageUrl(request.imageUrl().trim());
+        }
+
+        Tournament saved = tournamentRepository.save(tournament);
+        return mapToResponse(saved);
     }
 
     @Override

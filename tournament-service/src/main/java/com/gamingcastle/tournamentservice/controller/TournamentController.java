@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,6 +66,16 @@ public class TournamentController {
     @GetMapping("/{id}")
     public ResponseEntity<TournamentResponse> getTournamentById(@PathVariable UUID id) {
         return ResponseEntity.ok(tournamentService.getTournamentById(id));
+    }
+
+    /** Admin updates tournament information. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}")
+    public ResponseEntity<TournamentResponse> updateTournament(
+            @PathVariable UUID id,
+            @Valid @RequestBody TournamentUpdateRequest request
+    ) {
+        return ResponseEntity.ok(tournamentService.updateTournament(id, request));
     }
 
     /** FR-17: Admin updates tournament status (UPCOMING, ONGOING, COMPLETED). */

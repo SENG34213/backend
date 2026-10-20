@@ -10,6 +10,7 @@ public interface TournamentService {
     TournamentResponse createAndPublishTournament(TournamentRequest request, UUID adminId);
     List<TournamentResponse> getAllTournaments();
     TournamentResponse getTournamentById(UUID id);
+    TournamentResponse updateTournament(UUID id, com.gamingcastle.tournamentservice.dto.TournamentUpdateRequest request);
     TournamentResponse updateTournamentStatus(UUID id, TournamentStatusUpdateRequest request);
     TournamentResponse cancelTournament(UUID id);
     boolean isRegistrationOpen(UUID id);
