@@ -123,4 +123,34 @@ class SocketNotificationBroadcasterTest {
         Thread.sleep(200);
         verify(restTemplate, atLeastOnce()).postForEntity(anyString(), any(), eq(Map.class));
     }
+
+    @Test
+    @DisplayName("broadcast: includes targetUserId and targetUserIds in payload when provided")
+    @SuppressWarnings("unchecked")
+    void broadcast_shouldIncludeTargetUserIdAndUserIds_whenProvided() throws Exception {
+        broadcaster.broadcast(
+                "TOURNAMENT_CANCELLED",
+                "CANCEL",
+                "Tournament Cancelled",
+                "Arena Cup cancelled",
+                "trn-99",
+                "/tournaments",
+                "cust-001",
+                java.util.List.of("cust-001", "cust-002")
+        );
+
+        Thread.sleep(200);
+
+        ArgumentCaptor<HttpEntity<Map<String, Object>>> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate, atLeastOnce()).postForEntity(
+                eq("http://localhost:5001/api/notify"),
+                captor.capture(),
+                eq(Map.class)
+        );
+
+        Map<String, Object> body = captor.getValue().getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.get("targetUserId")).isEqualTo("cust-001");
+        assertThat(body.get("targetUserIds")).isEqualTo(java.util.List.of("cust-001", "cust-002"));
+    }
 }

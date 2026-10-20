@@ -65,7 +65,9 @@ public class NotificationService {
                 "New Booking Confirmed",
                 "Station " + request.gameStationName() + " booked by " + request.customerName() + " (" + request.timeSlot() + ")",
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -81,7 +83,9 @@ public class NotificationService {
                 "Booking Rescheduled",
                 "Booking #" + request.bookingId() + " at " + request.gameStationName() + " rescheduled to " + request.timeSlot(),
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -97,7 +101,9 @@ public class NotificationService {
                 "Booking Cancelled",
                 "Booking #" + request.bookingId() + " for " + request.customerName() + " at " + request.gameStationName() + " was cancelled",
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -113,23 +119,39 @@ public class NotificationService {
                 "Tournament Enrollment",
                 request.customerName() + " registered for " + request.tournamentName() + " (" + request.gameTitle() + ")",
                 null,
-                "/admin/tournaments"
+                "/admin/tournaments",
+                request.email(),
+                null
         );
     }
 
     public void sendTournamentCancelledEmail(TournamentCancelledEmailRequest request) {
-        sendEmail(
-                request.email(),
-                NotificationType.TOURNAMENT_CANCELLED,
-                emailTemplateService.createTournamentCancelledEmail(request)
-        );
+        if (request.email() != null && !request.email().isBlank()) {
+            sendEmail(
+                    request.email(),
+                    NotificationType.TOURNAMENT_CANCELLED,
+                    emailTemplateService.createTournamentCancelledEmail(request)
+            );
+        }
+
+        java.util.List<String> targetIds = null;
+        if (request.userId() != null && !request.userId().isBlank()) {
+            targetIds = new java.util.ArrayList<>();
+            targetIds.add(request.userId());
+            if (request.email() != null && !request.email().isBlank()) {
+                targetIds.add(request.email());
+            }
+        }
+
         socketNotificationBroadcaster.broadcast(
                 "TOURNAMENT_CANCELLED",
                 "CANCEL",
                 "Tournament Cancelled",
                 request.tournamentName() + " has been cancelled",
                 null,
-                "/admin/tournaments"
+                "/tournaments",
+                request.email() != null ? request.email() : request.userId(),
+                targetIds
         );
     }
 
@@ -145,7 +167,9 @@ public class NotificationService {
                 "Tournament Results Published 🏆",
                 "Final results for " + request.tournamentName() + " (" + request.gameTitle() + ") are now live!",
                 null,
-                "/tournaments"
+                "/tournaments",
+                request.email(),
+                null
         );
     }
 
@@ -168,7 +192,9 @@ public class NotificationService {
                 "Match Starting Soon ⚡",
                 details,
                 null,
-                "/tournaments"
+                "/tournaments",
+                request.email(),
+                null
         );
     }
 

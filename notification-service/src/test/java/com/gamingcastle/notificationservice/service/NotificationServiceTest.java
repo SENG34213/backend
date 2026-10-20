@@ -128,7 +128,9 @@ class NotificationServiceTest {
                 eq("New Booking Confirmed"),
                 contains("Station PC-01 booked by John"),
                 eq("bkg-100"),
-                eq("/admin/bookings")
+                eq("/admin/bookings"),
+                eq(request.email()),
+                isNull()
         );
     }
 
@@ -152,7 +154,9 @@ class NotificationServiceTest {
                 eq("Booking Rescheduled"),
                 contains("rescheduled to 14:00 - 16:00"),
                 eq("bkg-100"),
-                eq("/admin/bookings")
+                eq("/admin/bookings"),
+                eq(request.email()),
+                isNull()
         );
     }
 
@@ -176,7 +180,9 @@ class NotificationServiceTest {
                 eq("Booking Cancelled"),
                 contains("was cancelled"),
                 eq("bkg-100"),
-                eq("/admin/bookings")
+                eq("/admin/bookings"),
+                eq(request.email()),
+                isNull()
         );
     }
 
@@ -200,7 +206,9 @@ class NotificationServiceTest {
                 eq("Tournament Enrollment"),
                 contains("John registered for Apex Showdown"),
                 isNull(),
-                eq("/admin/tournaments")
+                eq("/admin/tournaments"),
+                eq(request.email()),
+                isNull()
         );
     }
 
@@ -224,7 +232,34 @@ class NotificationServiceTest {
                 eq("Tournament Cancelled"),
                 contains("Apex Showdown has been cancelled"),
                 isNull(),
-                eq("/admin/tournaments")
+                eq("/tournaments"),
+                eq(request.email()),
+                isNull()
+        );
+    }
+
+    @Test
+    @DisplayName("sendTournamentCancelledEmail: includes targetIds when userId is present")
+    void sendTournamentCancelledEmail_shouldIncludeTargetUserIds_whenUserIdProvided() {
+        TournamentCancelledEmailRequest request = new TournamentCancelledEmailRequest(
+                "gamer@example.com", "John", "Apex Showdown", "Server maintenance", "usr-123"
+        );
+        EmailContent emailContent = new EmailContent("Tournament Cancelled", "<p>Cancelled</p>");
+
+        when(emailTemplateService.createTournamentCancelledEmail(request)).thenReturn(emailContent);
+
+        notificationService.sendTournamentCancelledEmail(request);
+
+        verify(emailSenderService).sendHtmlEmail(request.email(), emailContent.subject(), emailContent.htmlBody());
+        verify(socketNotificationBroadcaster).broadcast(
+                eq("TOURNAMENT_CANCELLED"),
+                eq("CANCEL"),
+                eq("Tournament Cancelled"),
+                contains("Apex Showdown has been cancelled"),
+                isNull(),
+                eq("/tournaments"),
+                eq(request.email()),
+                eq(java.util.List.of("usr-123", "gamer@example.com"))
         );
     }
 
@@ -242,6 +277,16 @@ class NotificationServiceTest {
 
         verify(emailSenderService).sendHtmlEmail(request.email(), emailContent.subject(), emailContent.htmlBody());
         verify(notificationRecordService).recordSuccess(NotificationType.TOURNAMENT_RESULTS_PUBLISHED, request.email());
+        verify(socketNotificationBroadcaster).broadcast(
+                eq("TOURNAMENT_RESULTS"),
+                eq("TOURNAMENT"),
+                eq("Tournament Results Published 🏆"),
+                contains("Apex Showdown"),
+                isNull(),
+                eq("/tournaments"),
+                eq(request.email()),
+                isNull()
+        );
     }
 
     @Test
@@ -258,6 +303,16 @@ class NotificationServiceTest {
 
         verify(emailSenderService).sendHtmlEmail(request.email(), emailContent.subject(), emailContent.htmlBody());
         verify(notificationRecordService).recordSuccess(NotificationType.TOURNAMENT_REMINDER, request.email());
+        verify(socketNotificationBroadcaster).broadcast(
+                eq("MATCH_REMINDER"),
+                eq("TOURNAMENT"),
+                eq("Match Starting Soon ⚡"),
+                contains("Apex Showdown"),
+                isNull(),
+                eq("/tournaments"),
+                eq(request.email()),
+                isNull()
+        );
     }
 
     // ── SMS Notifications ─────────────────────────────────────────────────────

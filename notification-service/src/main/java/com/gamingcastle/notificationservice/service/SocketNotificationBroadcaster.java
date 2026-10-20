@@ -32,7 +32,7 @@ public class SocketNotificationBroadcaster {
                 .build();
     }
 
-    public void broadcast(String type, String category, String title, String message, String referenceId, String link) {
+    public void broadcast(String type, String category, String title, String message, String referenceId, String link, String targetUserId, java.util.List<String> targetUserIds) {
         CompletableFuture.runAsync(() -> {
             try {
                 HttpHeaders headers = new HttpHeaders();
@@ -45,6 +45,12 @@ public class SocketNotificationBroadcaster {
                 payload.put("message", message != null ? message : "");
                 payload.put("referenceId", referenceId != null ? referenceId : "");
                 payload.put("link", link != null ? link : "/admin");
+                if (targetUserId != null && !targetUserId.isBlank()) {
+                    payload.put("targetUserId", targetUserId);
+                }
+                if (targetUserIds != null && !targetUserIds.isEmpty()) {
+                    payload.put("targetUserIds", targetUserIds);
+                }
 
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
                 restTemplate.postForEntity(socketNotifyUrl, request, Map.class);
@@ -53,5 +59,9 @@ public class SocketNotificationBroadcaster {
                 log.debug("[Socket Notify] Socket server notification skipped or offline: {}", ex.getMessage());
             }
         });
+    }
+
+    public void broadcast(String type, String category, String title, String message, String referenceId, String link) {
+        broadcast(type, category, title, message, referenceId, link, null, null);
     }
 }
