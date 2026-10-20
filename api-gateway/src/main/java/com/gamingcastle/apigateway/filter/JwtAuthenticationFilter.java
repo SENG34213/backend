@@ -43,6 +43,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/auth/reactivate",     // covers /reactivate/request and /confirm (self-deactivated users, no token yet)
             "/actuator",
             "/api/stations",            // public station browsing and availability (FR-06/G1)
+            "/api/games",               // public game browsing and catalog
             "/api/tournaments"          // public tournament browsing
     );
 

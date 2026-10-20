@@ -38,6 +38,9 @@ public class GameStation {
     @Builder.Default
     private boolean active = true;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     @ManyToMany(mappedBy = "stations", fetch = FetchType.LAZY)
     @Builder.Default
     private java.util.Set<GameTitle> games = new java.util.HashSet<>();

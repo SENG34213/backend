@@ -44,6 +44,9 @@ public class UserServiceImpl implements UserService {
         // and enabled status are deliberately untouched by this endpoint.
         user.setFullName(request.fullName());
         user.setPhoneNumber(request.phoneNumber());
+        if (request.avatarUrl() != null) {
+            user.setAvatarUrl(request.avatarUrl().trim().isEmpty() ? null : request.avatarUrl().trim());
+        }
         userRepository.save(user);
 
         log.info("Profile updated: userId={}", userId);
@@ -127,7 +130,8 @@ public class UserServiceImpl implements UserService {
                 user.getEmail(),
                 user.getFullName(),
                 user.getPhoneNumber(),
-                user.getRole().name()
+                user.getRole().name(),
+                user.getAvatarUrl()
         );
     }
 
@@ -196,6 +200,9 @@ public class UserServiceImpl implements UserService {
                 user.deactivate(DeactivatedBy.ADMIN);
             }
         }
+        if (request.avatarUrl() != null) {
+            user.setAvatarUrl(request.avatarUrl().trim().isEmpty() ? null : request.avatarUrl().trim());
+        }
 
         user = userRepository.save(user);
         log.info("Admin updated user: userId={}, role={}, enabled={}", userId, user.getRole(), user.isEnabled());
@@ -211,7 +218,8 @@ public class UserServiceImpl implements UserService {
                 user.getRole().name(),
                 user.isEnabled(),
                 user.getCreatedAt(),
-                user.getDeactivatedBy()
+                user.getDeactivatedBy(),
+                user.getAvatarUrl()
         );
     }
 }
