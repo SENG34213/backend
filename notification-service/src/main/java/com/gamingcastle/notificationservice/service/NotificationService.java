@@ -65,7 +65,9 @@ public class NotificationService {
                 "New Booking Confirmed",
                 "Station " + request.gameStationName() + " booked by " + request.customerName() + " (" + request.timeSlot() + ")",
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -81,7 +83,9 @@ public class NotificationService {
                 "Booking Rescheduled",
                 "Booking #" + request.bookingId() + " at " + request.gameStationName() + " rescheduled to " + request.timeSlot(),
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -97,7 +101,9 @@ public class NotificationService {
                 "Booking Cancelled",
                 "Booking #" + request.bookingId() + " for " + request.customerName() + " at " + request.gameStationName() + " was cancelled",
                 request.bookingId(),
-                "/admin/bookings"
+                "/admin/bookings",
+                request.email(),
+                null
         );
     }
 
@@ -113,7 +119,9 @@ public class NotificationService {
                 "Tournament Enrollment",
                 request.customerName() + " registered for " + request.tournamentName() + " (" + request.gameTitle() + ")",
                 null,
-                "/admin/tournaments"
+                "/admin/tournaments",
+                request.email(),
+                null
         );
     }
 
@@ -129,7 +137,9 @@ public class NotificationService {
                 "Tournament Cancelled",
                 request.tournamentName() + " has been cancelled",
                 null,
-                "/admin/tournaments"
+                "/tournaments",
+                request.email(),
+                null
         );
     }
 
@@ -145,7 +155,9 @@ public class NotificationService {
                 "Tournament Results Published 🏆",
                 "Final results for " + request.tournamentName() + " (" + request.gameTitle() + ") are now live!",
                 null,
-                "/tournaments"
+                "/tournaments",
+                request.email(),
+                null
         );
     }
 
@@ -168,7 +180,9 @@ public class NotificationService {
                 "Match Starting Soon ⚡",
                 details,
                 null,
-                "/tournaments"
+                "/tournaments",
+                request.email(),
+                null
         );
     }
 
