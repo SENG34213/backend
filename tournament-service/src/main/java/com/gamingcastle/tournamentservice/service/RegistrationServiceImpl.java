@@ -50,13 +50,13 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = PaymentFailedException.class)
     public RegistrationResponse registerForTournament(UUID tournamentId, UUID userId) {
         return registerForTournament(tournamentId, userId, null, null);
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = PaymentFailedException.class)
     public RegistrationResponse registerForTournament(UUID tournamentId, UUID userId, String email, String fullName) {
         // 1. Load tournament or 404
         Tournament tournament = tournamentRepository.findById(tournamentId)
@@ -119,7 +119,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             paymentId = paymentClient.chargeEntryFee(tournament.getEntryFee(), userId, registration.getId());
         } catch (com.gamingcastle.tournamentservice.exception.PaymentFailedException e) {
             registration.setStatus(RegistrationStatus.CANCELLED);
-            registrationRepository.save(registration);
+            registrationRepository.saveAndFlush(registration);
             throw e;
         }
 
