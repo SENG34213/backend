@@ -56,6 +56,9 @@ public class Tournament {
     @Builder.Default
     private Boolean reminderSent = false;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -31,14 +31,14 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping(APIEndPoints.profile)
+    @GetMapping({APIEndPoints.profile, APIEndPoints.profileAlias})
     public ResponseEntity<UserProfileResponse> getMyProfile(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId) {
 
         return ResponseEntity.ok(userService.getMyProfile(userId));
     }
 
-    @PatchMapping(APIEndPoints.profile)
+    @PatchMapping({APIEndPoints.profile, APIEndPoints.profileAlias})
     public ResponseEntity<UserProfileResponse> updateCurrentUser(
             @RequestHeader(GatewayAuthenticationFilter.USER_ID_HEADER) UUID userId,
             @Valid @RequestBody UpdateProfileRequest request) {

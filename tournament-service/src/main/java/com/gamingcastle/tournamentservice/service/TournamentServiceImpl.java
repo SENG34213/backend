@@ -59,6 +59,7 @@ public class TournamentServiceImpl implements TournamentService {
                 .registrationDeadline(request.registrationDeadline())
                 .status(TournamentStatus.UPCOMING)
                 .createdByAdminId(adminId)
+                .imageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null)
                 .build();
 
         Tournament saved = tournamentRepository.save(tournament);
@@ -167,7 +168,8 @@ public class TournamentServiceImpl implements TournamentService {
                 t.getStatus(),
                 t.getCreatedByAdminId(),
                 t.getCreatedAt(),
-                isRegistrationOpen
+                isRegistrationOpen,
+                t.getImageUrl()
         );
     }
 

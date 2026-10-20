@@ -55,6 +55,9 @@ public class User extends BaseEntity{
     @Column(name = "deactivated_by")
     private DeactivatedBy deactivatedBy;
 
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    private String avatarUrl;
+
     public boolean isLocked() {
         return lockedUntil != null && lockedUntil.isAfter(Instant.now());
     }

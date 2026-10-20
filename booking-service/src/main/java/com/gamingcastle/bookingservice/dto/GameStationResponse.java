@@ -10,15 +10,21 @@ public record GameStationResponse(
     String stationCode,
     StationType type,
     BigDecimal hourlyRate,
-    boolean active
+    boolean active,
+    String imageUrl
 ) {
+    public GameStationResponse(UUID id, String stationCode, StationType type, BigDecimal hourlyRate, boolean active) {
+        this(id, stationCode, type, hourlyRate, active, null);
+    }
+
     public static GameStationResponse from(GameStation station) {
         return new GameStationResponse(
             station.getId(),
             station.getStationCode(),
             station.getType(),
             station.getHourlyRate(),
-            station.isActive()
+            station.isActive(),
+            station.getImageUrl()
         );
     }
 }

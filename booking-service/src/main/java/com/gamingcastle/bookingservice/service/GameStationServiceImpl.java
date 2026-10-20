@@ -48,6 +48,7 @@ public class GameStationServiceImpl implements GameStationService {
                 .type(request.type())
                 .hourlyRate(request.hourlyRate())
                 .active(request.active())
+                .imageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null)
                 .build();
 
         return GameStationResponse.from(gameStationRepository.save(station));
@@ -72,6 +73,9 @@ public class GameStationServiceImpl implements GameStationService {
         station.setType(request.type());
         station.setHourlyRate(request.hourlyRate());
         station.setActive(request.active());
+        if (request.imageUrl() != null) {
+            station.setImageUrl(request.imageUrl().trim().isEmpty() ? null : request.imageUrl().trim());
+        }
 
         return GameStationResponse.from(gameStationRepository.save(station));
     }

@@ -16,5 +16,11 @@ public record AdminUpdateUserRequest(
 
         Role role,
 
-        Boolean enabled
-) {}
+        Boolean enabled,
+
+        String avatarUrl
+) {
+    public AdminUpdateUserRequest(String fullName, String phoneNumber, Role role, Boolean enabled) {
+        this(fullName, phoneNumber, role, enabled, null);
+    }
+}
