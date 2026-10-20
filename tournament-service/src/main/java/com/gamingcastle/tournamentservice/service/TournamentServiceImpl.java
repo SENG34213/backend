@@ -173,7 +173,8 @@ public class TournamentServiceImpl implements TournamentService {
                                     recipientEmail,
                                     recipientName != null ? recipientName : "Gamer",
                                     tournament.getName(),
-                                    "The tournament has been cancelled by the administrator."
+                                    "The tournament has been cancelled by the administrator.",
+                                    reg.getUserId() != null ? reg.getUserId().toString() : null
                             )
                     );
                 } else {

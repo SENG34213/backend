@@ -239,6 +239,31 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("sendTournamentCancelledEmail: includes targetIds when userId is present")
+    void sendTournamentCancelledEmail_shouldIncludeTargetUserIds_whenUserIdProvided() {
+        TournamentCancelledEmailRequest request = new TournamentCancelledEmailRequest(
+                "gamer@example.com", "John", "Apex Showdown", "Server maintenance", "usr-123"
+        );
+        EmailContent emailContent = new EmailContent("Tournament Cancelled", "<p>Cancelled</p>");
+
+        when(emailTemplateService.createTournamentCancelledEmail(request)).thenReturn(emailContent);
+
+        notificationService.sendTournamentCancelledEmail(request);
+
+        verify(emailSenderService).sendHtmlEmail(request.email(), emailContent.subject(), emailContent.htmlBody());
+        verify(socketNotificationBroadcaster).broadcast(
+                eq("TOURNAMENT_CANCELLED"),
+                eq("CANCEL"),
+                eq("Tournament Cancelled"),
+                contains("Apex Showdown has been cancelled"),
+                isNull(),
+                eq("/tournaments"),
+                eq(request.email()),
+                eq(java.util.List.of("usr-123", "gamer@example.com"))
+        );
+    }
+
+    @Test
     @DisplayName("sendTournamentResultsEmail: creates template, sends email, and records success")
     void sendTournamentResultsEmail_shouldSendAndRecordSuccess() {
         TournamentResultsEmailRequest request = new TournamentResultsEmailRequest(

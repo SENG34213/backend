@@ -126,11 +126,23 @@ public class NotificationService {
     }
 
     public void sendTournamentCancelledEmail(TournamentCancelledEmailRequest request) {
-        sendEmail(
-                request.email(),
-                NotificationType.TOURNAMENT_CANCELLED,
-                emailTemplateService.createTournamentCancelledEmail(request)
-        );
+        if (request.email() != null && !request.email().isBlank()) {
+            sendEmail(
+                    request.email(),
+                    NotificationType.TOURNAMENT_CANCELLED,
+                    emailTemplateService.createTournamentCancelledEmail(request)
+            );
+        }
+
+        java.util.List<String> targetIds = null;
+        if (request.userId() != null && !request.userId().isBlank()) {
+            targetIds = new java.util.ArrayList<>();
+            targetIds.add(request.userId());
+            if (request.email() != null && !request.email().isBlank()) {
+                targetIds.add(request.email());
+            }
+        }
+
         socketNotificationBroadcaster.broadcast(
                 "TOURNAMENT_CANCELLED",
                 "CANCEL",
@@ -138,8 +150,8 @@ public class NotificationService {
                 request.tournamentName() + " has been cancelled",
                 null,
                 "/tournaments",
-                request.email(),
-                null
+                request.email() != null ? request.email() : request.userId(),
+                targetIds
         );
     }
 
