@@ -5,9 +5,9 @@ spring:
   application:
     name: tournament-service
   datasource:
-    url: ${TOURNAMENT_DB_URL}
-    username: ${TOURNAMENT_DB_USER}
-    password: ${TOURNAMENT_DB_PASSWORD}
+    url: ${TOURNAMENT_DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_tournaments}
+    username: postgres
+    password: Arivu1123
   jackson:
     time-zone: Asia/Colombo
   jpa:
