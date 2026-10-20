@@ -145,8 +145,9 @@ public class BookingController {
                 .format(response.startTime());
 
             notificationClient.sendBookingRescheduled(new NotificationClient.BookingEmailRequest(
-                email, fullName, response.id().toString(), response.stationCode(),
-                dateStr, timeSlot, "LKR. 1,000.00"));
+                    email, fullName, response.id().toString(), response.stationCode(),
+                    dateStr, timeSlot,
+                    "LKR. " + String.format("%,.2f", response.totalAmount())));
         }
 
         return ResponseEntity.ok(response);

@@ -295,8 +295,8 @@ public class BookingServiceImpl implements BookingService {
         UUID gameId = request.gameId() != null
                 ? request.gameId()
                 : (booking.getGame() != null ? booking.getGame().getId() : null);
-        GameTitle game = validateGameOnStation(station, gameId);
 
+        GameTitle game = gameId != null ? validateGameOnStation(station, gameId) : null;
         List<Booking> conflicts = bookingRepository.findOverlapping(
                 station.getId(), request.startTime(), request.endTime());
         
