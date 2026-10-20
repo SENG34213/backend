@@ -1,0 +1,36 @@
+# Test environment configuration for payment-service
+# Active during automated tests (@ActiveProfiles("test") or SPRING_PROFILES_ACTIVE=test)
+
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gamingcastle_payment_test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:Arivu1123}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: Asia/Colombo
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    enabled: false
+
+gateway:
+  internal-secret: test-gateway-internal-secret
+
+jwt:
+  secret: test-jwt-secret-key-that-is-at-least-32-bytes-long!
+  expiration-ms: 900000
+
+loyalty:
+  base-url: http://localhost:8085
