@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [develop, main]
 
+env:
+  MAVEN_OPTS: >-
+    -Dhttp.keepAlive=false
+    -Dmaven.wagon.http.pool=false
+    -Dmaven.wagon.http.retryHandler.count=5
+    -Dmaven.wagon.http.retryHandler.requestSentEnabled=true
+    -Daether.connector.http.retryHandler.count=5
+    -Daether.connector.http.retryHandler.requestSentEnabled=true
+    -Daether.connector.connectionTimeout=60000
+    -Daether.connector.requestTimeout=60000
+
 jobs:
   # Eureka and the Gateway don't touch the database, so they're built
   # separately from the matrix below — no Postgres service container needed.
@@ -20,7 +31,20 @@ jobs:
           java-version: '17'
           cache: maven
       - working-directory: eureka-server
-        run: mvn -B clean verify
+        run: |
+          for i in 1 2 3; do
+            echo "=== Eureka Server build (attempt $i of 3) ==="
+            if mvn -B -U clean verify; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "Eureka Server build failed after 3 attempts."
+              exit 1
+            fi
+            echo "Build failed on attempt $i (transient network or repository issue). Retrying in 10s..."
+            find ~/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true
+            sleep 10
+          done
 
   gateway-build:
     name: API Gateway – Build & Test
@@ -33,7 +57,20 @@ jobs:
           java-version: '17'
           cache: maven
       - working-directory: api-gateway
-        run: mvn -B clean verify
+        run: |
+          for i in 1 2 3; do
+            echo "=== API Gateway build (attempt $i of 3) ==="
+            if mvn -B -U clean verify; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "API Gateway build failed after 3 attempts."
+              exit 1
+            fi
+            echo "Build failed on attempt $i (transient network or repository issue). Retrying in 10s..."
+            find ~/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true
+            sleep 10
+          done
 
   # One job, run once per service in the matrix, instead of 5 near-identical
   # job blocks — a broken build in ANY service fails independently and is
@@ -75,7 +112,20 @@ jobs:
 
       - name: Build & test ${{ matrix.service }}
         working-directory: ${{ matrix.service }}
-        run: mvn -B clean verify
+        run: |
+          for i in 1 2 3; do
+            echo "=== Building ${{ matrix.service }} (attempt $i of 3) ==="
+            if mvn -B -U clean verify; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "Build for ${{ matrix.service }} failed after 3 attempts."
+              exit 1
+            fi
+            echo "Build failed on attempt $i (transient network or repository issue). Retrying in 15s..."
+            find ~/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true
+            sleep 15
+          done
         env:
           SPRING_PROFILES_ACTIVE: test
           DB_URL: jdbc:postgresql://localhost:5432/gamingcastle_test
