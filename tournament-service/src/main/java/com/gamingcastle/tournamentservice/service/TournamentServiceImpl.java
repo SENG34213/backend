@@ -70,6 +70,7 @@ public class TournamentServiceImpl implements TournamentService {
     @Override
     public List<TournamentResponse> getAllTournaments() {
         return tournamentRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(Tournament::getStartDate))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -192,13 +193,14 @@ public class TournamentServiceImpl implements TournamentService {
         boolean isNotFull = tournament.getParticipantCount() < tournament.getMaxParticipants();
         boolean isBeforeDeadline = Instant.now().isBefore(tournament.getRegistrationDeadline());
         
-        return isNotFull && isBeforeDeadline && tournament.getStatus() == TournamentStatus.UPCOMING;
+        return isNotFull && isBeforeDeadline &&
+                (tournament.getStatus() == TournamentStatus.UPCOMING || tournament.getStatus() == TournamentStatus.REGISTRATION_OPEN);
     }
 
     private TournamentResponse mapToResponse(Tournament t) {
         boolean isRegistrationOpen = t.getParticipantCount() < t.getMaxParticipants() &&
                 Instant.now().isBefore(t.getRegistrationDeadline()) &&
-                t.getStatus() == TournamentStatus.UPCOMING;
+                (t.getStatus() == TournamentStatus.UPCOMING || t.getStatus() == TournamentStatus.REGISTRATION_OPEN);
 
         return new TournamentResponse(
                 t.getId(),
@@ -226,7 +228,7 @@ public class TournamentServiceImpl implements TournamentService {
         List<Tournament> upcomingTournaments = tournamentRepository.findByStartDateLessThanEqualAndReminderSentFalse(targetThreshold);
 
         for (Tournament tournament : upcomingTournaments) {
-            if (tournament.getStatus() == TournamentStatus.UPCOMING) {
+            if (tournament.getStatus() == TournamentStatus.UPCOMING || tournament.getStatus() == TournamentStatus.REGISTRATION_OPEN) {
                 sendPreTournamentReminders(tournament.getId());
             }
         }
