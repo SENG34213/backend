@@ -18,7 +18,7 @@ import java.security.NoSuchAlgorithmException;
  * PayHere checkout payload parameters.
  */
 @Component
-@ConditionalOnProperty(name = "payment.gateway.provider", havingValue = "payhere")
+@ConditionalOnProperty(name = "payment.gateway.provider", havingValue = "payhere", matchIfMissing = true)
 public class PayHerePaymentGateway implements PaymentGateway {
 
     private static final Logger log = LoggerFactory.getLogger(PayHerePaymentGateway.class);

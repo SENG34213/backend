@@ -1,11 +1,12 @@
 package com.gamingcastle.paymentservice.gateway;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
 @Component
-@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(PayHerePaymentGateway.class)
+@ConditionalOnProperty(name = "payment.gateway.provider", havingValue = "mock")
 public class MockPaymentGateway implements PaymentGateway {
 
     @Override

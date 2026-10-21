@@ -236,4 +236,69 @@ class PaymentControllerTest {
         assertThat(csvBody).contains("95.00");
         assertThat(csvBody).contains("GC-CSV-1");
     }
+
+    @Test
+    @DisplayName("handlePayHereNotification: returns 200 OK for valid query param notification")
+    void handlePayHereNotification_shouldReturnOk_forValidQueryParams() {
+        when(paymentService.handlePayHereNotification(
+                "1211111", "ORD-1", "PAY-1", "1000.00", "LKR", "2", "SIG123"))
+                .thenReturn(PaymentResponse.builder().id(UUID.randomUUID()).build());
+
+        ResponseEntity<String> response = controller.handlePayHereNotification(
+                "1211111", "ORD-1", "PAY-1", "1000.00", "LKR", "2", "SIG123", null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo("OK");
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: parses payload from body map and returns 200 OK")
+    void handlePayHereNotification_shouldReturnOk_forValidBodyMap() {
+        java.util.Map<String, Object> body = java.util.Map.of(
+                "merchant_id", "1211111",
+                "order_id", "ORD-2",
+                "payment_id", "PAY-2",
+                "payhere_amount", "500.00",
+                "payhere_currency", "LKR",
+                "status_code", "2",
+                "md5sig", "SIG456"
+        );
+
+        when(paymentService.handlePayHereNotification(
+                "1211111", "ORD-2", "PAY-2", "500.00", "LKR", "2", "SIG456"))
+                .thenReturn(PaymentResponse.builder().id(UUID.randomUUID()).build());
+
+        ResponseEntity<String> response = controller.handlePayHereNotification(
+                null, null, null, null, null, null, null, body);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo("OK");
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: returns 400 Bad Request on IllegalArgumentException")
+    void handlePayHereNotification_shouldReturn400_onIllegalArgumentException() {
+        when(paymentService.handlePayHereNotification(any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalArgumentException("Invalid signature"));
+
+        ResponseEntity<String> response = controller.handlePayHereNotification(
+                "1211111", "ORD-3", "PAY-3", "100.00", "LKR", "2", "BADSIG", null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("Invalid signature");
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: returns 500 on unexpected exception")
+    void handlePayHereNotification_shouldReturn500_onUnexpectedException() {
+        when(paymentService.handlePayHereNotification(any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("Database error"));
+
+        ResponseEntity<String> response = controller.handlePayHereNotification(
+                "1211111", "ORD-4", "PAY-4", "100.00", "LKR", "2", "SIG", null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isEqualTo("Processing error");
+    }
 }
+
