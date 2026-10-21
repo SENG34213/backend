@@ -18,7 +18,7 @@ spring:
         - id: booking-service
           uri: lb://booking-service
           predicates:
-            - Path=/api/bookings/**,/api/bookings,/api/stations/**,/api/stations,/api/bookings/admin/**,/api/bookings/admin,/api/games/**,/api/games,/api/admin/games/**,/api/admin/games
+            - Path=/api/bookings/**,/api/bookings,/api/stations/**,/api/stations,/api/bookings/admin/**,/api/bookings/admin,/api/games/**,/api/games,/api/admin/games/**,/api/admin/games,/api/reviews/**,/api/reviews
         - id: payment-service
           uri: lb://payment-service
           predicates:
@@ -44,3 +44,8 @@ jwt:
 
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
+  ratelimit:
+    auth:
+      replenish-rate: 5
+      burst-capacity: 10
+
