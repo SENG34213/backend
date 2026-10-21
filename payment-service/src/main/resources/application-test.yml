@@ -10,3 +10,7 @@ spring:
 eureka:
   client:
     enabled: false   # integration tests don't need service discovery running
+
+payment:
+  gateway:
+    provider: mock

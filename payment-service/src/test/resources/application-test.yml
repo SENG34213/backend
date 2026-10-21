@@ -34,3 +34,7 @@ jwt:
 
 loyalty:
   base-url: http://localhost:8085
+
+payment:
+  gateway:
+    provider: mock
