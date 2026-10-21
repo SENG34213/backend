@@ -63,6 +63,10 @@ class BookingControllerIntegrationTest {
     @MockBean
     private LoyaltyClient loyaltyClient;
 
+    // Seeded by V2__create_game_tables.sql: "Tekken 8" (PS5,PC,XBOX_SERIES_X) is installed on every PC station.
+    // A booking now needs a game that is installed on the chosen station.
+    private static final UUID GAME_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+
     private GameStation station;
     private UUID customerId;
     private UUID adminId;
@@ -75,24 +79,28 @@ class BookingControllerIntegrationTest {
                 .orElseThrow(() -> new IllegalStateException(
                         "Seed station PC-01 not found - check V1__create_booking_tables.sql ran against the test DB"));
 
+        assertThat(gameStationRepository.existsByIdAndGames_Id(station.getId(), GAME_ID))
+                .as("Seed game 101 (Tekken 8) must be installed on PC-01 - check V2__create_game_tables.sql ran against the test DB")
+                .isTrue();
+
         customerId = UUID.randomUUID();
         adminId = UUID.randomUUID();
 
         // Mock PaymentClient.chargeBookingFee() to return a successful payment result
         // This allows all online booking tests to succeed instead of failing with 400 BAD_REQUEST
-       
+
         when(paymentClient.chargeBookingFee(
-        any(BigDecimal.class),
-        any(UUID.class),
-        any(UUID.class),
-        nullable(String.class),
-        nullable(Integer.class)))
-        .thenReturn(new PaymentClient.PaymentResult(
-                UUID.randomUUID(),
-                new BigDecimal("100.00"),
-                BigDecimal.ZERO,
-                new BigDecimal("100.00")
-        ));
+                any(BigDecimal.class),
+                any(UUID.class),
+                any(UUID.class),
+                nullable(String.class),
+                nullable(Integer.class)))
+                .thenReturn(new PaymentClient.PaymentResult(
+                        UUID.randomUUID(),
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("100.00")
+                ));
 
     }
 
@@ -104,53 +112,53 @@ class BookingControllerIntegrationTest {
         return headers;
     }
 
-    
-private Instant availableStartTime() {
-    Instant firstCandidate = Instant.now()
-            .plus(30, ChronoUnit.DAYS)
-            .truncatedTo(ChronoUnit.DAYS)
-            .plus(10, ChronoUnit.HOURS);
 
-    for (int day = 0; day < 365; day++) {
-        Instant candidate = firstCandidate.plus(day, ChronoUnit.DAYS);
-        Instant end = candidate.plus(1, ChronoUnit.HOURS);
+    private Instant availableStartTime() {
+        Instant firstCandidate = Instant.now()
+                .plus(30, ChronoUnit.DAYS)
+                .truncatedTo(ChronoUnit.DAYS)
+                .plus(10, ChronoUnit.HOURS);
 
-        if (bookingRepository.findOverlapping(
-                station.getId(), candidate, end).isEmpty()) {
-            return candidate;
+        for (int day = 0; day < 365; day++) {
+            Instant candidate = firstCandidate.plus(day, ChronoUnit.DAYS);
+            Instant end = candidate.plus(1, ChronoUnit.HOURS);
+
+            if (bookingRepository.findOverlapping(
+                    station.getId(), candidate, end).isEmpty()) {
+                return candidate;
+            }
         }
+
+        throw new IllegalStateException(
+                "No available test booking slot found within 365 days");
     }
 
-    throw new IllegalStateException(
-            "No available test booking slot found within 365 days");
-}
 
 
-    
 
 
-@Test
-void postBookings_asCustomer_shouldSucceed() {
-    Instant start = availableStartTime();
-    Instant end = start.plus(1, ChronoUnit.HOURS);
+    @Test
+    void postBookings_asCustomer_shouldSucceed() {
+        Instant start = availableStartTime();
+        Instant end = start.plus(1, ChronoUnit.HOURS);
 
-    BookingRequest request =
-            new BookingRequest(station.getId(), start, end);
+        BookingRequest request =
+                new BookingRequest(station.getId(), GAME_ID, start, end);
 
-    HttpEntity<BookingRequest> entity =
-            new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
+        HttpEntity<BookingRequest> entity =
+                new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
 
-    ResponseEntity<BookingResponse> response =
-            restTemplate.postForEntity(
-                    "/api/bookings",
-                    entity,
-                    BookingResponse.class
-            );
+        ResponseEntity<BookingResponse> response =
+                restTemplate.postForEntity(
+                        "/api/bookings",
+                        entity,
+                        BookingResponse.class
+                );
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody().userId()).isEqualTo(customerId);
-}
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().userId()).isEqualTo(customerId);
+    }
 
 
 
@@ -159,7 +167,7 @@ void postBookings_asCustomer_shouldSucceed() {
         // Arrange
         Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), start, end);
+        WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), GAME_ID, start, end);
         HttpEntity<WalkInBookingRequest> entity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
 
         // Act
@@ -175,7 +183,7 @@ void postBookings_asCustomer_shouldSucceed() {
         // Arrange
         Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), start, end);
+        WalkInBookingRequest request = new WalkInBookingRequest(customerId, station.getId(), GAME_ID, start, end);
         HttpEntity<WalkInBookingRequest> entity = new HttpEntity<>(request, headersFor(adminId, "ADMIN"));
 
         // Act
@@ -193,13 +201,13 @@ void postBookings_asCustomer_shouldSucceed() {
         // Arrange — create a booking as customerId
         Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), GAME_ID, start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
         ResponseEntity<BookingResponse> createResponse =
                 restTemplate.postForEntity("/api/bookings", createEntity, BookingResponse.class);
         assertThat(createResponse.getStatusCode())
-        .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
-        .isEqualTo(HttpStatus.CREATED);
+                .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
 
         assertThat(createResponse.getBody()).isNotNull();
         UUID bookingId = createResponse.getBody().id();
@@ -220,15 +228,15 @@ void postBookings_asCustomer_shouldSucceed() {
         // Arrange
         Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), GAME_ID, start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
         ResponseEntity<BookingResponse> createResponse =
                 restTemplate.postForEntity("/api/bookings", createEntity, BookingResponse.class);
-                assertThat(createResponse.getStatusCode())
-        .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
-        .isEqualTo(HttpStatus.CREATED);
+        assertThat(createResponse.getStatusCode())
+                .withFailMessage("Booking creation failed: %s", createResponse.getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
 
-assertThat(createResponse.getBody()).isNotNull();
+        assertThat(createResponse.getBody()).isNotNull();
         UUID bookingId = createResponse.getBody().id();
 
         HttpEntity<Void> cancelEntity = new HttpEntity<>(headersFor(adminId, "ADMIN"));
@@ -246,7 +254,7 @@ assertThat(createResponse.getBody()).isNotNull();
         // Arrange
         Instant start = availableStartTime();
         Instant end = start.plus(1, ChronoUnit.HOURS);
-        BookingRequest request = new BookingRequest(station.getId(), start, end);
+        BookingRequest request = new BookingRequest(station.getId(), GAME_ID, start, end);
         HttpEntity<BookingRequest> createEntity = new HttpEntity<>(request, headersFor(customerId, "CUSTOMER"));
         restTemplate.postForEntity("/api/bookings", createEntity, BookingResponse.class);
 
