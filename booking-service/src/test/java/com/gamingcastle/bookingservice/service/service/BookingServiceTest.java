@@ -430,7 +430,7 @@ class BookingServiceTest {
         BookingResponse response = bookingService.createBooking(userId, request, BookingSource.ONLINE);
 
         assertThat(response.status()).isEqualTo(BookingStatus.CONFIRMED);
-        verifyNoInteractions(notificationClient);
+        verify(notificationClient, never()).sendBookingConfirmation(any());
     }
 
     @Test

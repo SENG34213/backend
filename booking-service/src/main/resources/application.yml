@@ -37,13 +37,30 @@ jwt:
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
 
-# Base URL for inter-service HTTP calls (override via env var for Docker/cloud)
 services:
   payment:
     base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
   notification:
     base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
-
+  socket-server:
+    base-url: ${SOCKET_SERVER_URL:http://localhost:5001}
 
 loyalty:
   base-url: ${LOYALTY_BASE_URL:http://localhost:8085}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      loyaltyService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
