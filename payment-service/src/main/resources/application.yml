@@ -38,3 +38,15 @@ jwt:
 
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET:}
+
+payment:
+  gateway:
+    provider: ${PAYMENT_GATEWAY_PROVIDER:payhere}
+
+payhere:
+  merchant:
+    id: ${PAYHERE_MERCHANT_ID:1211111}
+    secret: ${PAYHERE_MERCHANT_SECRET:sandbox-secret-for-payhere}
+  currency: ${PAYHERE_CURRENCY:LKR}
+  sandbox: ${PAYHERE_SANDBOX:true}
+

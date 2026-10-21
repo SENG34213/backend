@@ -36,4 +36,15 @@ public interface PaymentService {
 
     /** G11 — Admin dashboard stats for the payment service slice. */
     AdminPaymentStatsResponse getPaymentStats(int trendDays);
+
+    /** Recommendation 4 — Handle PayHere IPN Webhook callback with MD5 verification. */
+    PaymentResponse handlePayHereNotification(
+            String merchantId,
+            String orderId,
+            String paymentId,
+            String payhereAmount,
+            String payhereCurrency,
+            String statusCode,
+            String md5sig
+    );
 }

@@ -61,6 +61,76 @@ public class PaymentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Recommendation 4: PayHere IPN Webhook Listener.
+     * Receives asynchronous payment approval/failure callbacks from PayHere,
+     * verifies MD5 security signature, and updates payment record status.
+     * Accessible without JWT authentication (public webhook).
+     */
+    @PostMapping(value = "/payhere/notify", consumes = {
+            MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            MediaType.APPLICATION_JSON_VALUE
+    })
+    public ResponseEntity<String> handlePayHereNotification(
+            @RequestParam(name = "merchant_id", required = false) String merchantId,
+            @RequestParam(name = "order_id", required = false) String orderId,
+            @RequestParam(name = "payment_id", required = false) String paymentId,
+            @RequestParam(name = "payhere_amount", required = false) String payhereAmount,
+            @RequestParam(name = "payhere_currency", required = false) String payhereCurrency,
+            @RequestParam(name = "status_code", required = false) String statusCode,
+            @RequestParam(name = "md5sig", required = false) String md5sig,
+            @RequestBody(required = false) java.util.Map<String, Object> bodyMap) {
+
+        String effectiveMerchantId = merchantId;
+        String effectiveOrderId = orderId;
+        String effectivePaymentId = paymentId;
+        String effectiveAmount = payhereAmount;
+        String effectiveCurrency = payhereCurrency;
+        String effectiveStatusCode = statusCode;
+        String effectiveMd5Sig = md5sig;
+
+        if (bodyMap != null && !bodyMap.isEmpty()) {
+            if (effectiveMerchantId == null && bodyMap.containsKey("merchant_id")) {
+                effectiveMerchantId = String.valueOf(bodyMap.get("merchant_id"));
+            }
+            if (effectiveOrderId == null && bodyMap.containsKey("order_id")) {
+                effectiveOrderId = String.valueOf(bodyMap.get("order_id"));
+            }
+            if (effectivePaymentId == null && bodyMap.containsKey("payment_id")) {
+                effectivePaymentId = String.valueOf(bodyMap.get("payment_id"));
+            }
+            if (effectiveAmount == null && bodyMap.containsKey("payhere_amount")) {
+                effectiveAmount = String.valueOf(bodyMap.get("payhere_amount"));
+            }
+            if (effectiveCurrency == null && bodyMap.containsKey("payhere_currency")) {
+                effectiveCurrency = String.valueOf(bodyMap.get("payhere_currency"));
+            }
+            if (effectiveStatusCode == null && bodyMap.containsKey("status_code")) {
+                effectiveStatusCode = String.valueOf(bodyMap.get("status_code"));
+            }
+            if (effectiveMd5Sig == null && bodyMap.containsKey("md5sig")) {
+                effectiveMd5Sig = String.valueOf(bodyMap.get("md5sig"));
+            }
+        }
+
+        try {
+            paymentService.handlePayHereNotification(
+                    effectiveMerchantId,
+                    effectiveOrderId,
+                    effectivePaymentId,
+                    effectiveAmount,
+                    effectiveCurrency,
+                    effectiveStatusCode,
+                    effectiveMd5Sig
+            );
+            return ResponseEntity.ok("OK");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Processing error");
+        }
+    }
+
     @GetMapping("/{id}/receipt")
     public ResponseEntity<PaymentResponse> getPaymentReceipt(
             @PathVariable UUID id,

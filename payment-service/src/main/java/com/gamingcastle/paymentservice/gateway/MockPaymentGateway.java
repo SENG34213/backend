@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(PayHerePaymentGateway.class)
 public class MockPaymentGateway implements PaymentGateway {
 
     @Override
