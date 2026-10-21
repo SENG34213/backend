@@ -14,12 +14,21 @@ import java.util.UUID;
  */
 public record BookingRequest(
         @NotNull UUID stationId,
+        UUID gameId,
         @NotNull @Future Instant startTime,
         @NotNull @Future Instant endTime,
         String paymentMethod,
         Integer loyaltyPointsToRedeem
 ) {
+    public BookingRequest(UUID stationId, UUID gameId, Instant startTime, Instant endTime) {
+        this(stationId, gameId, startTime, endTime, null, null);
+    }
+
     public BookingRequest(UUID stationId, Instant startTime, Instant endTime) {
-        this(stationId, startTime, endTime, null, null);
+        this(stationId, null, startTime, endTime, null, null);
+    }
+
+    public BookingRequest(UUID stationId, Instant startTime, Instant endTime, String paymentMethod, Integer loyaltyPointsToRedeem) {
+        this(stationId, null, startTime, endTime, paymentMethod, loyaltyPointsToRedeem);
     }
 }
