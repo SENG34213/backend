@@ -66,7 +66,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         // 2. BR-06: registration must be open (deadline + capacity + status)
         boolean isBeforeDeadline = Instant.now().isBefore(tournament.getRegistrationDeadline());
         boolean isNotFull = tournament.getParticipantCount() < tournament.getMaxParticipants();
-        boolean isUpcoming = tournament.getStatus() == TournamentStatus.UPCOMING;
+        boolean isUpcoming = tournament.getStatus() == TournamentStatus.UPCOMING ||
+                tournament.getStatus() == TournamentStatus.REGISTRATION_OPEN;
 
         if (!isBeforeDeadline || !isNotFull || !isUpcoming) {
             throw new RegistrationClosedException(
