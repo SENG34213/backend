@@ -44,7 +44,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/actuator",
             "/api/stations",            // public station browsing and availability (FR-06/G1)
             "/api/games",               // public game browsing and catalog
-            "/api/tournaments"          // public tournament browsing
+            "/api/tournaments",         // public tournament browsing
+            "/api/payments/payhere/notify" // public PayHere payment IPN webhook listener
     );
 
     @Override

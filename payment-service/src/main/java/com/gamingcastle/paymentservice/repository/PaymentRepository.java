@@ -23,6 +23,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID>, JpaSpec
 
     Optional<Payment> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<Payment> findByReferenceId(UUID referenceId);
+
     // ── Dashboard: total revenue for a time window (G11) ─────────────────────
 
     @Query("""

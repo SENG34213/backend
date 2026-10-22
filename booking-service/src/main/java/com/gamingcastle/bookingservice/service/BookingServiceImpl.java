@@ -53,6 +53,7 @@ public class BookingServiceImpl implements BookingService {
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
     private final UserClient userClient;
+    private final SagaCompensationService sagaCompensationService;
 
     @Value("${booking.cancel-window-hours:2}")
     private int cancelWindowHours = 2;
@@ -65,6 +66,21 @@ public class BookingServiceImpl implements BookingService {
             PaymentClient paymentClient,
             NotificationClient notificationClient,
             UserClient userClient) {
+        this(bookingRepository, gameStationRepository, gameRepository, loyaltyClient,
+                paymentClient, notificationClient, userClient, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public BookingServiceImpl(
+            BookingRepository bookingRepository,
+            GameStationRepository gameStationRepository,
+            GameRepository gameRepository,
+            LoyaltyClient loyaltyClient,
+            PaymentClient paymentClient,
+            NotificationClient notificationClient,
+            UserClient userClient,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            SagaCompensationService sagaCompensationService) {
         this.bookingRepository = bookingRepository;
         this.gameStationRepository = gameStationRepository;
         this.gameRepository = gameRepository;
@@ -72,6 +88,19 @@ public class BookingServiceImpl implements BookingService {
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
         this.userClient = userClient;
+        this.sagaCompensationService = sagaCompensationService;
+    }
+
+    private String formatSlotDate(Instant instant) {
+        return DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(SRI_LANKA_ZONE).format(instant);
+    }
+
+    private String formatSlotTime(Instant instant) {
+        return DateTimeFormatter.ofPattern("HH:mm").withZone(SRI_LANKA_ZONE).format(instant);
+    }
+
+    private String safeBookingId(Booking booking) {
+        return (booking != null && booking.getId() != null) ? booking.getId().toString() : "";
     }
 
     @Override
@@ -125,6 +154,9 @@ public class BookingServiceImpl implements BookingService {
         // FR-14: Charge booking fee = station.hourlyRate × duration in hours
         // On payment failure → booking is set to CANCELLED (no orphaned PENDING records).
         // Walk-in (cash) bookings skip card payment — admin handles cash directly.
+        String slotDate = formatSlotDate(booking.getStartTime());
+        String slotTime = formatSlotTime(booking.getStartTime());
+
         if (source == BookingSource.ONLINE) {
             PaymentClient.PaymentResult paymentResult;
             try {
@@ -138,13 +170,19 @@ public class BookingServiceImpl implements BookingService {
             } catch (BookingException e) {
                 booking.setStatus(BookingStatus.CANCELLED);
                 bookingRepository.save(booking);
+                if (sagaCompensationService != null) {
+                    sagaCompensationService.executeCompensation(booking.getId(), "LOYALTY_REVERSE", "Online payment failed: " + e.getMessage());
+                }
                 throw e;
             }
 
-            // ADD THIS NULL CHECK
+            // Null check
             if (paymentResult == null) {
                 booking.setStatus(BookingStatus.CANCELLED);
                 bookingRepository.save(booking);
+                if (sagaCompensationService != null) {
+                    sagaCompensationService.executeCompensation(booking.getId(), "LOYALTY_REVERSE", "Payment result was null");
+                }
                 throw new BookingException(HttpStatus.BAD_REQUEST, "PAYMENT_FAILED",
                         "Payment processing returned no result");
             }
@@ -157,12 +195,36 @@ public class BookingServiceImpl implements BookingService {
             discountAmount = paymentResult.discountAmount();
             payableAmount = paymentResult.payableAmount();
 
+            if (sagaCompensationService != null && booking.getId() != null) {
+                sagaCompensationService.recordAction(booking.getId(), "BOOKING_CONFIRMED", "PaymentId=" + paymentResult.paymentId());
+            }
+
+            // Real-time socket broadcast for slot and notifications
+            notificationClient.broadcastSlotEvent(station.getId(), slotDate, slotTime, "BOOKED");
+            notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                    "BOOKING_CREATED", "BOOKING", "New Booking Confirmed",
+                    "Booking for station " + station.getStationCode() + " on " + slotDate + " at " + slotTime + " confirmed.",
+                    safeBookingId(booking), "/customer/my-bookings", userId != null ? userId.toString() : null, true
+            ));
+
             // Send confirmation email after successful payment
             sendBookingConfirmedEmail(booking, payableAmount);
         } else {
             // WALK_IN: admin records cash manually via POST /api/payments/cash later
             // Booking remains PENDING until admin calls PATCH /{id}/confirm with paymentId
             booking = bookingRepository.save(booking);
+
+            if (sagaCompensationService != null && booking.getId() != null) {
+                sagaCompensationService.recordAction(booking.getId(), "WALK_IN_CREATED", "Station=" + station.getStationCode());
+            }
+
+            // Live slot broadcast so customer browsing screens immediately see station as occupied
+            notificationClient.broadcastSlotEvent(station.getId(), slotDate, slotTime, "BOOKED");
+            notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                    "WALK_IN_CREATED", "BOOKING", "Walk-In Booking Created",
+                    "Admin booked station " + station.getStationCode() + " on " + slotDate + " at " + slotTime,
+                    safeBookingId(booking), "/admin/bookings", null, true
+            ));
         }
 
         return BookingResponse.from(booking, totalAmount, discountAmount, payableAmount);
@@ -253,7 +315,22 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setStatus(BookingStatus.CANCELLED);
         booking = bookingRepository.save(booking);
-        loyaltyClient.reverse(bookingId, "Booking cancelled");
+
+        if (sagaCompensationService != null) {
+            sagaCompensationService.executeCompensation(bookingId, "LOYALTY_REVERSE", "Booking cancelled by " + (callerIsAdmin ? "admin" : "customer"));
+        } else {
+            loyaltyClient.reverse(bookingId, "Booking cancelled");
+        }
+
+        String slotDate = formatSlotDate(booking.getStartTime());
+        String slotTime = formatSlotTime(booking.getStartTime());
+        notificationClient.broadcastSlotEvent(booking.getStation().getId(), slotDate, slotTime, "RELEASED");
+        notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                "BOOKING_CANCELLED", "BOOKING", "Booking Cancelled",
+                "Booking on station " + booking.getStation().getStationCode() + " was cancelled.",
+                safeBookingId(booking), "/customer/my-bookings", booking.getUserId() != null ? booking.getUserId().toString() : null, true
+        ));
+
         return BookingResponse.from(booking);
     }
 
@@ -308,12 +385,33 @@ public class BookingServiceImpl implements BookingService {
                     "Station " + station.getStationCode() + " is already booked for part of that time range");
         }
 
+        Instant oldStart = booking.getStartTime();
+        UUID oldStationId = booking.getStation().getId();
+
         booking.setStation(station);
         booking.setGame(game);
         booking.setStartTime(request.startTime());
         booking.setEndTime(request.endTime());
         
         booking = bookingRepository.save(booking);
+
+        String oldDate = formatSlotDate(oldStart);
+        String oldTime = formatSlotTime(oldStart);
+        String newDate = formatSlotDate(booking.getStartTime());
+        String newTime = formatSlotTime(booking.getStartTime());
+        notificationClient.broadcastSlotEvent(oldStationId, oldDate, oldTime, "RELEASED");
+        notificationClient.broadcastSlotEvent(station.getId(), newDate, newTime, "BOOKED");
+
+        if (sagaCompensationService != null && booking.getId() != null) {
+            sagaCompensationService.recordAction(booking.getId(), "BOOKING_RESCHEDULED", "New slot: " + newDate + " " + newTime);
+        }
+
+        notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                "BOOKING_RESCHEDULED", "BOOKING", "Booking Rescheduled",
+                "Booking moved to " + newDate + " at " + newTime,
+                safeBookingId(booking), "/customer/my-bookings", booking.getUserId() != null ? booking.getUserId().toString() : null, true
+        ));
+
         return BookingResponse.from(booking);
     }
 
@@ -346,6 +444,20 @@ public class BookingServiceImpl implements BookingService {
         booking.setPaymentId(paymentId);
         booking.setStatus(BookingStatus.CONFIRMED);
         booking = bookingRepository.save(booking);
+
+        if (sagaCompensationService != null && booking.getId() != null) {
+            sagaCompensationService.recordAction(booking.getId(), "WALK_IN_CONFIRMED", "PaymentId: " + paymentId);
+        }
+
+        String slotDate = formatSlotDate(booking.getStartTime());
+        String slotTime = formatSlotTime(booking.getStartTime());
+        notificationClient.broadcastSlotEvent(booking.getStation().getId(), slotDate, slotTime, "BOOKED");
+        String shortId = booking.getId() != null ? booking.getId().toString().substring(0, Math.min(8, booking.getId().toString().length())) : "";
+        notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                "BOOKING_CONFIRMED", "BOOKING", "Walk-In Payment Confirmed",
+                "Booking #" + shortId + " payment confirmed.",
+                safeBookingId(booking), "/admin/bookings", booking.getUserId() != null ? booking.getUserId().toString() : null, true
+        ));
 
         // Send confirmation email once WALK_IN booking is confirmed via admin cash payment
         sendBookingConfirmedEmail(booking, BigDecimal.ZERO);

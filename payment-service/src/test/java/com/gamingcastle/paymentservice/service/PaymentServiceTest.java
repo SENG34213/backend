@@ -22,6 +22,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -46,6 +48,8 @@ class PaymentServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         paymentService = new PaymentServiceImpl(paymentRepository, paymentGateway, loyaltyClient);
+        ReflectionTestUtils.setField(paymentService, "payHereMerchantId", "1211111");
+        ReflectionTestUtils.setField(paymentService, "payHereMerchantSecret", "secret123");
     }
 
     @Test
@@ -617,4 +621,142 @@ class PaymentServiceTest {
         request.setIdempotencyKey(idempotencyKey);
         return request;
     }
+
+    @Test
+    @DisplayName("handlePayHereNotification: marks payment SUCCESS and generates receipt on status_code 2")
+    void handlePayHereNotification_shouldMarkSuccess_whenSignatureValidAndStatus2() {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = Payment.builder()
+                .id(paymentId)
+                .userId(UUID.randomUUID())
+                .amount(new BigDecimal("1000.00"))
+                .method(PaymentMethod.ONLINE)
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        String sig = computePayHereSig("1211111", paymentId.toString(), "1000.00", "LKR", "2", "secret123");
+
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        PaymentResponse response = paymentService.handlePayHereNotification(
+                "1211111", paymentId.toString(), "PAY-1", "1000.00", "LKR", "2", sig);
+
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(payment.getReceiptNumber()).isNotNull().startsWith("GC-");
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: marks payment FAILED on status_code -1, -2, or -3")
+    void handlePayHereNotification_shouldMarkFailed_whenNegativeStatusCode() {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = Payment.builder()
+                .id(paymentId)
+                .userId(UUID.randomUUID())
+                .amount(new BigDecimal("1000.00"))
+                .method(PaymentMethod.ONLINE)
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        String sig = computePayHereSig("1211111", paymentId.toString(), "1000.00", "LKR", "-2", "secret123");
+
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        PaymentResponse response = paymentService.handlePayHereNotification(
+                "1211111", paymentId.toString(), "PAY-1", "1000.00", "LKR", "-2", sig);
+
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getReceiptNumber()).isNull();
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: throws IllegalArgumentException when signature is invalid or blank")
+    void handlePayHereNotification_shouldThrowException_whenSignatureInvalid() {
+        assertThatThrownBy(() -> paymentService.handlePayHereNotification(
+                "1211111", "ORD-1", "PAY-1", "1000.00", "LKR", "2", "BADSIG"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid PayHere signature verification");
+
+        assertThatThrownBy(() -> paymentService.handlePayHereNotification(
+                "1211111", "ORD-1", "PAY-1", "1000.00", "LKR", "2", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid PayHere signature verification");
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: throws IllegalArgumentException when payment cannot be found")
+    void handlePayHereNotification_shouldThrowException_whenPaymentNotFound() {
+        UUID randomId = UUID.randomUUID();
+        String sig = computePayHereSig("1211111", randomId.toString(), "1000.00", "LKR", "2", "secret123");
+
+        when(paymentRepository.findById(randomId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByReferenceId(randomId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.handlePayHereNotification(
+                "1211111", randomId.toString(), "PAY-1", "1000.00", "LKR", "2", sig))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No payment found matching orderId");
+    }
+
+    @Test
+    @DisplayName("handlePayHereNotification: locates payment by referenceId or idempotencyKey")
+    void handlePayHereNotification_shouldFindPaymentByReferenceIdOrIdempotencyKey() {
+        UUID referenceId = UUID.randomUUID();
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .referenceId(referenceId)
+                .amount(new BigDecimal("500.00"))
+                .method(PaymentMethod.ONLINE)
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        String sigRef = computePayHereSig("1211111", referenceId.toString(), "500.00", "LKR", "2", "secret123");
+
+        when(paymentRepository.findById(referenceId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByReferenceId(referenceId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        PaymentResponse res1 = paymentService.handlePayHereNotification(
+                "1211111", referenceId.toString(), "PAY-1", "500.00", "LKR", "2", sigRef);
+        assertThat(res1.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+
+        // Test non-UUID orderId looking up by idempotencyKey
+        Payment payment2 = Payment.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .idempotencyKey("idemp-key-999")
+                .amount(new BigDecimal("200.00"))
+                .method(PaymentMethod.ONLINE)
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        String sigIdemp = computePayHereSig("1211111", "idemp-key-999", "200.00", "LKR", "2", "secret123");
+        when(paymentRepository.findByIdempotencyKey("idemp-key-999")).thenReturn(Optional.of(payment2));
+
+        PaymentResponse res2 = paymentService.handlePayHereNotification(
+                "1211111", "idemp-key-999", "PAY-2", "200.00", "LKR", "2", sigIdemp);
+        assertThat(res2.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+    }
+
+    private String computePayHereSig(String merchantId, String orderId, String amount, String currency, String statusCode, String secret) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] secBytes = md.digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sbSec = new StringBuilder();
+            for (byte b : secBytes) sbSec.append(String.format("%02x", b));
+            String secretHash = sbSec.toString().toUpperCase();
+
+            String raw = merchantId + orderId + amount + currency + statusCode + secretHash;
+            byte[] rawBytes = md.digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : rawBytes) sb.append(String.format("%02x", b));
+            return sb.toString().toUpperCase();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
+

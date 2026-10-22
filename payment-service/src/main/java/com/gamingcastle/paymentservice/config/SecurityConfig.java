@@ -37,6 +37,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
+                                "/api/payments/payhere/notify",
                                 "/error"
                         ).permitAll()
                         .requestMatchers("/api/internal/**").hasRole("SERVICE")

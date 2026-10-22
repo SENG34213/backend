@@ -19,6 +19,9 @@ public class NotificationClient {
     @Value("${services.notification.base-url:http://localhost:8086}")
     private String notificationBaseUrl;
 
+    @Value("${services.socket-server.base-url:http://localhost:5001}")
+    private String socketServerBaseUrl;
+
     @Value("${gateway.internal-secret}")
     private String gatewaySecret;
 
@@ -62,6 +65,43 @@ public class NotificationClient {
                 Void.class);
     }
 
+    /**
+     * Bridges notifications directly to Node.js Socket.IO server on port 5001.
+     * Instant real-time UI toast and badge updates for admin and customers.
+     */
+    public void broadcastSocketNotification(SocketNotificationPayload payload) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            restTemplate.postForEntity(
+                    socketServerBaseUrl + "/api/notify",
+                    new HttpEntity<>(payload, headers),
+                    Void.class);
+            log.info("Pushed real-time socket notification: title='{}', target={}", payload.title(), payload.targetUserId());
+        } catch (Exception e) {
+            log.warn("Could not push socket notification to {}: {}", socketServerBaseUrl, e.getMessage());
+        }
+    }
+
+    /**
+     * Pushes real-time slot lock/unlock/booked events directly to Socket.IO.
+     * Prevents page refreshes across all connected customer and admin browsers.
+     */
+    public void broadcastSlotEvent(java.util.UUID stationId, String date, String timeSlot, String event) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            SlotEventPayload payload = new SlotEventPayload(event, stationId.toString(), date, timeSlot);
+            restTemplate.postForEntity(
+                    socketServerBaseUrl + "/api/slots/event",
+                    new HttpEntity<>(payload, headers),
+                    Void.class);
+            log.info("Pushed real-time slot event: event='{}', station={}, slot={} {}", event, stationId, date, timeSlot);
+        } catch (Exception e) {
+            log.warn("Could not push slot event to {}: {}", socketServerBaseUrl, e.getMessage());
+        }
+    }
+
     public record BookingEmailRequest(
             String email,
             String customerName,
@@ -70,5 +110,23 @@ public class NotificationClient {
             String bookingDate,
             String timeSlot,
             String amount
+    ) {}
+
+    public record SocketNotificationPayload(
+            String type,
+            String category,
+            String title,
+            String message,
+            String referenceId,
+            String link,
+            String targetUserId,
+            boolean broadcast
+    ) {}
+
+    public record SlotEventPayload(
+            String event, // 'BOOKED' or 'RELEASED'
+            String stationId,
+            String date,
+            String timeSlot
     ) {}
 }

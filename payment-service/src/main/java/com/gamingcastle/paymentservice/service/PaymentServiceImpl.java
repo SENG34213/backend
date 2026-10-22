@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
 
@@ -34,11 +37,18 @@ import jakarta.persistence.criteria.Predicate;
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentServiceImpl.class);
     private static final ZoneId SLST = ZoneId.of("Asia/Colombo");
 
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
     private final LoyaltyClient loyaltyClient;
+
+    @Value("${payhere.merchant.id:1211111}")
+    private String payHereMerchantId;
+
+    @Value("${payhere.merchant.secret:replace-with-secret}")
+    private String payHereMerchantSecret;
 
     @Override
     @Transactional
@@ -314,5 +324,88 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse handlePayHereNotification(
+            String merchantId,
+            String orderId,
+            String paymentId,
+            String payhereAmount,
+            String payhereCurrency,
+            String statusCode,
+            String md5sig) {
+
+        log.info("Received PayHere IPN notification: orderId={}, status={}, amount={}",
+                orderId, statusCode, payhereAmount);
+
+        boolean verified = verifyPayHereSignature(merchantId, orderId, payhereAmount, payhereCurrency, statusCode, md5sig);
+        if (!verified) {
+            log.error("PayHere notification rejected: Invalid MD5 signature for orderId={}", orderId);
+            throw new IllegalArgumentException("Invalid PayHere signature verification");
+        }
+
+        Payment payment = null;
+        try {
+            UUID parsedId = UUID.fromString(orderId);
+            payment = paymentRepository.findById(parsedId)
+                    .orElse(null);
+            if (payment == null) {
+                payment = paymentRepository.findByReferenceId(parsedId)
+                        .orElse(null);
+            }
+        } catch (IllegalArgumentException ignored) {
+            payment = paymentRepository.findByIdempotencyKey(orderId).orElse(null);
+        }
+
+        if (payment == null) {
+            log.warn("Payment not found for PayHere orderId={}", orderId);
+            throw new IllegalArgumentException("No payment found matching orderId: " + orderId);
+        }
+
+        // Status code 2 = Success in PayHere
+        if ("2".equals(statusCode)) {
+            payment.setStatus(PaymentStatus.SUCCESS);
+            if (payment.getReceiptNumber() == null) {
+                payment.setReceiptNumber(generateReceiptNumber());
+            }
+            log.info("PayHere payment marked SUCCESS for paymentId={}", payment.getId());
+        } else if ("-1".equals(statusCode) || "-2".equals(statusCode) || "-3".equals(statusCode)) {
+            payment.setStatus(PaymentStatus.FAILED);
+            log.warn("PayHere payment failed/cancelled (statusCode={}) for paymentId={}", statusCode, payment.getId());
+        }
+
+        Payment saved = paymentRepository.save(payment);
+        return toResponse(saved);
+    }
+
+    private boolean verifyPayHereSignature(String merchantId, String orderId, String amount, String currency, String statusCode, String md5sig) {
+        if (md5sig == null || md5sig.isBlank()) {
+            return false;
+        }
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            String secretHash = toHex(md.digest(payHereMerchantSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8))).toUpperCase();
+            String raw = (merchantId != null && !merchantId.isBlank() ? merchantId : payHereMerchantId)
+                    + orderId
+                    + amount
+                    + currency
+                    + statusCode
+                    + secretHash;
+            String computed = toHex(md.digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8))).toUpperCase();
+            return computed.equalsIgnoreCase(md5sig.trim());
+        } catch (Exception e) {
+            log.error("MD5 calculation error in IPN verification", e);
+            return false;
+        }
+    }
+
+    private String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 }

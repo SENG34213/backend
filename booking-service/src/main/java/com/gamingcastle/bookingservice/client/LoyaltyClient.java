@@ -1,5 +1,6 @@
 package com.gamingcastle.bookingservice.client;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -39,6 +40,7 @@ public class LoyaltyClient {
                 .build();
     }
 
+    @CircuitBreaker(name = "loyaltyService", fallbackMethod = "reverseFallback")
     public void reverse(UUID bookingId, String reason) {
         ReverseRequest request = new ReverseRequest(bookingId, reason);
         HttpHeaders headers = new HttpHeaders();
@@ -74,6 +76,14 @@ public class LoyaltyClient {
                 }
             }
         }
+    }
+
+    /**
+     * Fallback when Loyalty Service is down or circuit breaker is OPEN.
+     */
+    public void reverseFallback(UUID bookingId, String reason, Throwable t) {
+        log.error("Resilience4j Circuit Breaker triggered for loyaltyService reverse: bookingId={}, reason={}, error={}",
+                bookingId, reason, t.getMessage());
     }
 
     public record ReverseRequest(UUID bookingId, String reason) {}

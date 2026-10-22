@@ -1,6 +1,7 @@
 package com.gamingcastle.bookingservice.client;
 
 import com.gamingcastle.bookingservice.exception.BookingException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ import java.util.UUID;
  *
  * FR-14: Charges the booking fee via the payment-service REST API.
  * Uses an idempotency key (userId-bookingId) to prevent double charges on retries.
+ * Protected with Resilience4j Circuit Breaker.
  */
 @Service
 public class PaymentClient {
@@ -51,15 +53,9 @@ public class PaymentClient {
 
     /**
      * Charges the booking fee for a given user and booking.
-     *
-     * @param amount         the total booking fee before loyalty discount
-     * @param userId         the customer's UUID
-     * @param bookingId      the booking UUID (used as referenceId and idempotency key seed)
-     * @param method         payment method — e.g. "CARD", "ONLINE", "CASH"
-     * @param pointsToRedeem optional loyalty points to redeem
-     * @return PaymentResult containing paymentId and price breakdown
-     * @throws BookingException (HTTP 402) if payment fails or service is unreachable
+     * Protected by Resilience4j Circuit Breaker ("paymentService").
      */
+    @CircuitBreaker(name = "paymentService", fallbackMethod = "paymentFallback")
     public PaymentResult chargeBookingFee(BigDecimal amount, UUID userId, UUID bookingId, String method, Integer pointsToRedeem) {
         String idempotencyKey = userId.toString() + "-" + bookingId.toString();
         String selectedMethod = (method != null && !method.isBlank()) ? method.toUpperCase() : "CARD";
@@ -124,6 +120,21 @@ public class PaymentClient {
             throw new BookingException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED",
                     "Could not reach payment service for bookingId: " + bookingId + " — " + e.getMessage());
         }
+    }
+
+    /**
+     * Resilience4j fallback method when paymentService is down or circuit breaker is OPEN.
+     */
+    public PaymentResult paymentFallback(BigDecimal amount, UUID userId, UUID bookingId, String method, Integer pointsToRedeem, Throwable t) {
+        if (t instanceof BookingException be) {
+            throw be;
+        }
+        log.error("Payment service unreachable / circuit breaker OPEN for bookingId={}: {}", bookingId, t.getMessage());
+        throw new BookingException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "PAYMENT_SERVICE_UNAVAILABLE",
+                "Payment processing is currently unavailable. Your slot has been temporarily held."
+        );
     }
 
     private String extractErrorMessage(String responseBody) {
