@@ -48,17 +48,17 @@ public class GatewayHeaderAuthFilter extends OncePerRequestFilter {
         String userIdHeader = request.getHeader(USER_ID_HEADER);
         String roleHeader = request.getHeader(USER_ROLE_HEADER);
 
-        if (gatewaySecret == null || !gatewaySecret.equals(expectedGatewaySecret)) {
-            unauthorized(response, "Request must come through the API Gateway");
-            return;
-        }
-
-        // Guest browsing of tournaments
+        // Guest browsing of tournaments (public read)
         if ("GET".equalsIgnoreCase(request.getMethod()) && path.startsWith("/api/tournaments")) {
             if (userIdHeader == null || userIdHeader.isBlank()) {
                 filterChain.doFilter(request, response);
                 return;
             }
+        }
+
+        if (gatewaySecret == null || !gatewaySecret.equals(expectedGatewaySecret)) {
+            unauthorized(response, "Request must come through the API Gateway");
+            return;
         }
 
         if (userIdHeader == null || roleHeader == null || userIdHeader.isBlank() || roleHeader.isBlank()) {

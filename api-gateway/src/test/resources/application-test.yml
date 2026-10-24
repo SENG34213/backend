@@ -28,7 +28,7 @@ spring:
         - id: tournament-service
           uri: http://localhost:${wiremock.server.port:8084}
           predicates:
-            - Path=/api/tournaments/**
+            - Path=/api/tournaments/**,/api/tournaments
         - id: loyalty-service
           uri: http://localhost:${wiremock.server.port:8085}
           predicates:
