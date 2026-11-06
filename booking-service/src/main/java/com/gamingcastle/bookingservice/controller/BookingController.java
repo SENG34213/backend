@@ -123,6 +123,18 @@ public class BookingController {
         return ResponseEntity.ok(response);
     }
 
+    /** Complete — customer confirms their session finished, or admin completes it. */
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
+    @PatchMapping("/{id}/complete")
+    public ResponseEntity<BookingResponse> completeBooking(
+            @PathVariable("id") UUID bookingId,
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ID_HEADER) UUID userId,
+            @RequestHeader(GatewayHeaderAuthFilter.USER_ROLE_HEADER) String role) {
+        boolean isAdmin = "ADMIN".equals(role);
+        BookingResponse response = bookingService.completeBooking(bookingId, userId, isAdmin);
+        return ResponseEntity.ok(response);
+    }
+
     /** Reschedule an existing CONFIRMED booking */
     @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @PatchMapping("/{id}/reschedule")

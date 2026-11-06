@@ -137,6 +137,29 @@ public class TournamentServiceImpl implements TournamentService {
 
     @Override
     @Transactional
+    public TournamentResponse completeTournament(UUID id, UUID callerId, boolean callerIsAdmin) {
+        Tournament tournament = tournamentRepository.findById(id)
+                .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + id));
+
+        if (!callerIsAdmin) {
+            boolean isParticipant = registrationRepository.findByTournamentId(id).stream()
+                    .anyMatch(r -> r.getUserId().equals(callerId));
+            if (!isParticipant) {
+                throw new IllegalStateException("You are not registered in this tournament");
+            }
+        }
+
+        if (tournament.getStatus() == TournamentStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot complete a cancelled tournament");
+        }
+
+        tournament.setStatus(TournamentStatus.COMPLETED);
+        Tournament saved = tournamentRepository.save(tournament);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
     public TournamentResponse cancelTournament(UUID id) {
         Tournament tournament = tournamentRepository.findById(id)
                 .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + id));
