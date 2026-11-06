@@ -1,5 +1,6 @@
 package com.gamingcastle.userservice.service;
 
+import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
 import com.gamingcastle.userservice.dto.request.AdminUpdateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.AdminUserStatsResponse;
@@ -19,6 +20,7 @@ public interface UserService {
     UserSummaryResponse getUserById(UUID userId);
     AdminUserStatsResponse getUserStats();
     UserSummaryResponse adminUpdateUser(UUID userId, AdminUpdateUserRequest request);
+    UserSummaryResponse adminCreateUser(AdminCreateUserRequest request);
     void deactivateMyAccount(UUID userId);
     void deactivateUser(UUID targetUserId, UUID adminId);
     void activateUser(UUID userId);

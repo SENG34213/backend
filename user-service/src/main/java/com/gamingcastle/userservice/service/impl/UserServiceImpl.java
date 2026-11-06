@@ -1,9 +1,15 @@
 package com.gamingcastle.userservice.service.impl;
 
+import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
+import com.gamingcastle.userservice.entity.DeactivatedBy;
+import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
+import com.gamingcastle.userservice.exception.EmailAlreadyExistsException;
+import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
+import com.gamingcastle.userservice.exception.UserAlreadyActiveException;
 import com.gamingcastle.userservice.exception.UserAlreadyDeactivatedException;
 import com.gamingcastle.userservice.exception.UserNotFoundException;
 import com.gamingcastle.userservice.repository.UserRepository;
@@ -11,10 +17,10 @@ import com.gamingcastle.userservice.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.gamingcastle.userservice.entity.DeactivatedBy;
-import com.gamingcastle.userservice.exception.UserAlreadyActiveException;
 
 import java.util.UUID;
 
@@ -23,9 +29,15 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserRepository userRepository) {
+        this(userRepository, new BCryptPasswordEncoder(12));
+    }
+
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder != null ? passwordEncoder : new BCryptPasswordEncoder(12);
     }
 
     @Override
@@ -206,6 +218,46 @@ public class UserServiceImpl implements UserService {
 
         user = userRepository.save(user);
         log.info("Admin updated user: userId={}, role={}, enabled={}", userId, user.getRole(), user.isEnabled());
+        return toSummaryResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse adminCreateUser(AdminCreateUserRequest request) {
+        String email = request.email().toLowerCase().trim();
+        log.info("Admin creating user with email: {}", email);
+
+        if (userRepository.existsByEmail(email)) {
+            log.warn("User creation failed - email already exists: {}", email);
+            throw new EmailAlreadyExistsException();
+        }
+
+        String phoneNumber = request.phoneNumber() != null ? request.phoneNumber().trim() : null;
+        if (phoneNumber != null && !phoneNumber.isBlank() && userRepository.existsByPhoneNumber(phoneNumber)) {
+            log.warn("User creation failed - phone number already exists: {}", phoneNumber);
+            throw new PhoneAlreadyExistsException();
+        }
+
+        String rawPassword = (request.password() != null && !request.password().isBlank())
+                ? request.password().trim()
+                : "Gaming@123";
+
+        String avatarUrl = (request.avatarUrl() != null && !request.avatarUrl().trim().isEmpty())
+                ? request.avatarUrl().trim()
+                : null;
+
+        User user = User.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode(rawPassword))
+                .fullName(request.fullName().trim())
+                .phoneNumber(phoneNumber != null && !phoneNumber.isBlank() ? phoneNumber : null)
+                .role(request.role() != null ? request.role() : Role.CUSTOMER)
+                .avatarUrl(avatarUrl)
+                .enabled(request.enabled() != null ? request.enabled() : true)
+                .build();
+
+        user = userRepository.save(user);
+        log.info("Admin successfully created user: id={}, email={}", user.getId(), user.getEmail());
         return toSummaryResponse(user);
     }
 
