@@ -10,7 +10,7 @@ public record ReviewResponse(
         UUID stationId,
         String stationCode,
         String gameTitle,
-        int rating,
+        Double rating,
         String comment,
         Instant createdAt,
         Instant updatedAt
