@@ -7,6 +7,7 @@ import com.gamingcastle.bookingservice.entity.GameStation;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,11 @@ public class GameStationServiceImpl implements GameStationService {
         this(gameStationRepository, bookingRepository, Clock.system(SRI_LANKA_ZONE));
     }
 
-    public GameStationServiceImpl(GameStationRepository gameStationRepository, BookingRepository bookingRepository, Clock clock) {
+    @Autowired
+    public GameStationServiceImpl(
+            GameStationRepository gameStationRepository,
+            BookingRepository bookingRepository,
+            @Autowired(required = false) Clock clock) {
         this.gameStationRepository = gameStationRepository;
         this.bookingRepository = bookingRepository;
         this.clock = clock != null ? clock : Clock.system(SRI_LANKA_ZONE);

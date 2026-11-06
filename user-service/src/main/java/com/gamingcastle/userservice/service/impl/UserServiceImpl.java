@@ -15,6 +15,7 @@ import com.gamingcastle.userservice.exception.UserNotFoundException;
 import com.gamingcastle.userservice.repository.UserRepository;
 import com.gamingcastle.userservice.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,7 +36,10 @@ public class UserServiceImpl implements UserService {
         this(userRepository, new BCryptPasswordEncoder(12));
     }
 
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    @Autowired
+    public UserServiceImpl(
+            UserRepository userRepository,
+            @Autowired(required = false) PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder != null ? passwordEncoder : new BCryptPasswordEncoder(12);
     }
