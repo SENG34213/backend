@@ -1,10 +1,12 @@
 package com.gamingcastle.userservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
 import com.gamingcastle.userservice.entity.DeactivatedBy;
+import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.exception.GlobalExceptionHandler;
 import com.gamingcastle.userservice.exception.UserAlreadyActiveException;
 import com.gamingcastle.userservice.exception.UserAlreadyDeactivatedException;
@@ -36,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -269,5 +272,45 @@ class UserControllerTest {
         mockMvc.perform(patch("/api/users/" + targetUserId + "/activate"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("USER_ALREADY_ACTIVE"));
+    }
+
+    // --- POST /api/users ---
+
+    @Test
+    @DisplayName("POST /api/users: should return 201 Created and UserSummaryResponse when valid request")
+    void createUser_shouldReturnCreated_whenValidRequest() throws Exception {
+        UUID userId = UUID.randomUUID();
+        AdminCreateUserRequest req = new AdminCreateUserRequest(
+                "New Player", "newplayer@example.com", "0771234567", Role.CUSTOMER, "secret123", "https://img.example/avatar.png", true
+        );
+        UserSummaryResponse response = new UserSummaryResponse(
+                userId, "newplayer@example.com", "New Player", "0771234567",
+                "CUSTOMER", true, Instant.now(), null, "https://img.example/avatar.png"
+        );
+
+        when(userService.adminCreateUser(any(AdminCreateUserRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.email").value("newplayer@example.com"))
+                .andExpect(jsonPath("$.fullName").value("New Player"));
+
+        verify(userService).adminCreateUser(any(AdminCreateUserRequest.class));
+    }
+
+    @Test
+    @DisplayName("POST /api/users: should return 400 Bad Request when missing required fields")
+    void createUser_shouldReturnBadRequest_whenInvalidRequest() throws Exception {
+        AdminCreateUserRequest req = new AdminCreateUserRequest(
+                "", "invalid-email", "invalid-phone", Role.CUSTOMER, "123", null, true
+        );
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
     }
 }
