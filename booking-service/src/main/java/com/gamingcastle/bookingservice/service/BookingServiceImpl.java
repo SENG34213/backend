@@ -336,6 +336,41 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    public BookingResponse completeBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND",
+                        "No booking exists with id " + bookingId));
+
+        if (!callerIsAdmin && !booking.getUserId().equals(callerId)) {
+            throw new BookingException(HttpStatus.FORBIDDEN, "NOT_YOUR_BOOKING",
+                    "You can only complete your own bookings");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BookingException(HttpStatus.CONFLICT, "CANNOT_COMPLETE_CANCELLED",
+                    "Cannot mark a cancelled booking as completed");
+        }
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            return BookingResponse.from(booking);
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        booking = bookingRepository.save(booking);
+
+        if (notificationClient != null) {
+            notificationClient.broadcastSocketNotification(new NotificationClient.SocketNotificationPayload(
+                    "BOOKING_COMPLETED", "BOOKING", "Booking Completed 🎮",
+                    "Session on station " + (booking.getStation() != null ? booking.getStation().getStationCode() : "") + " has completed.",
+                    safeBookingId(booking), "/customer/my-bookings", booking.getUserId() != null ? booking.getUserId().toString() : null, true
+            ));
+        }
+
+        return BookingResponse.from(booking);
+    }
+
+    @Override
+    @Transactional
     public BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND",

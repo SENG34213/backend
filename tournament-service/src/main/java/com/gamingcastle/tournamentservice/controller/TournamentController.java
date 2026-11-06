@@ -88,6 +88,17 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.updateTournamentStatus(id, request));
     }
 
+    /** Customer participant or admin marks tournament as completed. */
+    @PatchMapping("/{id}/complete")
+    public ResponseEntity<TournamentResponse> completeTournament(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Role", defaultValue = "CUSTOMER") String role
+    ) {
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
+        return ResponseEntity.ok(tournamentService.completeTournament(id, userId, isAdmin));
+    }
+
     /** UC-09 alt flow: Admin cancels a tournament — all registered participants notified. */
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasRole('ADMIN')")
