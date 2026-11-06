@@ -37,7 +37,12 @@ public class SecurityConfig {
                                 "/api/games",
                                 "/api/games/**",
                                 "/api/admin/games",
-                                "/api/admin/games/**"
+                                "/api/admin/games/**",
+                                "/api/reviews/recent",
+                                "/api/reviews/station/**",
+                                "/api/reviews/all",
+                                "/api/bookings/reviews/recent",
+                                "/api/bookings/*/review"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
