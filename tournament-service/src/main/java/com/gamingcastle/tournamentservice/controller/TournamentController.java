@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,6 +77,14 @@ public class TournamentController {
             @Valid @RequestBody TournamentUpdateRequest request
     ) {
         return ResponseEntity.ok(tournamentService.updateTournament(id, request));
+    }
+
+    /** Admin deletes a tournament. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTournament(@PathVariable UUID id) {
+        tournamentService.deleteTournament(id);
+        return ResponseEntity.noContent().build();
     }
 
     /** FR-17: Admin updates tournament status (UPCOMING, ONGOING, COMPLETED). */

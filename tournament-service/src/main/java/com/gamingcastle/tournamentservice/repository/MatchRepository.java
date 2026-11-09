@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface MatchRepository extends JpaRepository<Match, UUID> {
     List<Match> findByBracketIdOrderByRoundAsc(UUID bracketId);
     List<Match> findByBracketIdAndRound(UUID bracketId, int round);
+    void deleteByBracketId(UUID bracketId);
 }

@@ -89,10 +89,12 @@ public class RegistrationServiceImpl implements RegistrationService {
         // 4. Resolve user email and full name
         String resolvedEmail = email;
         String resolvedName = fullName;
-        if (resolvedEmail == null || resolvedEmail.isBlank()) {
+        if ((resolvedEmail == null || resolvedEmail.isBlank()) || (resolvedName == null || resolvedName.isBlank())) {
             var userOpt = userClient.getUserById(userId);
             if (userOpt.isPresent()) {
-                resolvedEmail = userOpt.get().email();
+                if (resolvedEmail == null || resolvedEmail.isBlank()) {
+                    resolvedEmail = userOpt.get().email();
+                }
                 if (resolvedName == null || resolvedName.isBlank()) {
                     resolvedName = userOpt.get().fullName();
                 }
@@ -187,6 +189,26 @@ public class RegistrationServiceImpl implements RegistrationService {
     // processEntryFeePayment stub removed — real payment handled by PaymentClient.chargeEntryFee()
 
     private RegistrationResponse mapToResponse(TournamentRegistration r) {
+        String name = r.getUserName();
+        String email = r.getUserEmail();
+
+        if ((name == null || name.isBlank()) && r.getUserId() != null) {
+            try {
+                var userOpt = userClient.getUserById(r.getUserId());
+                if (userOpt.isPresent()) {
+                    name = userOpt.get().fullName();
+                    if (email == null || email.isBlank()) {
+                        email = userOpt.get().email();
+                    }
+                    r.setUserName(name);
+                    r.setUserEmail(email);
+                    registrationRepository.save(r);
+                }
+            } catch (Exception ignored) {
+                // Ignore resolution failure during listing
+            }
+        }
+
         return new RegistrationResponse(
                 r.getId(),
                 r.getTournament().getId(),
@@ -194,7 +216,10 @@ public class RegistrationServiceImpl implements RegistrationService {
                 r.getUserId(),
                 r.getStatus(),
                 r.getPaymentId(),
-                r.getRegisteredAt()
+                r.getRegisteredAt(),
+                name,
+                name,
+                email
         );
     }
 }

@@ -239,6 +239,15 @@ class TournamentControllerTest {
     }
 
     @Test
+    @DisplayName("deleteTournament should call service and return 204 No Content")
+    void deleteTournament_shouldReturnNoContent() {
+        ResponseEntity<Void> response = tournamentController.deleteTournament(tournamentId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(tournamentService).deleteTournament(tournamentId);
+    }
+
+    @Test
     @DisplayName("sendPreTournamentReminders should trigger reminders and return 200 OK")
     void sendPreTournamentReminders_shouldReturnOk() {
         ResponseEntity<Void> response = tournamentController.sendPreTournamentReminders(tournamentId);
