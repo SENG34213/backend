@@ -15,7 +15,7 @@ public record AdminCreateUserRequest(
         @Email(message = "Invalid email format")
         String email,
 
-        @Pattern(regexp = "^$|^(\\+94|0)?[0-9]{9,10}$", message = "Invalid phone number format")
+        @Pattern(regexp = "^$|^(?:\\+94|0)[0-9]{9}$", message = "Phone must match +94XXXXXXXXX or 0XXXXXXXXX")
         String phoneNumber,
 
         Role role,

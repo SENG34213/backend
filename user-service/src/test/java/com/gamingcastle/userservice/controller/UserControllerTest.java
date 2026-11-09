@@ -2,6 +2,7 @@ package com.gamingcastle.userservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
+import com.gamingcastle.userservice.dto.request.AdminUpdateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -312,5 +314,90 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- PUT /api/users/{userId} ---
+
+    @Test
+    @DisplayName("PUT /api/users/{userId}: should return 200 OK when changing customer role to ADMIN with 07XXXXXXXX phone")
+    void updateUser_shouldReturnOk_whenChangingRoleToAdminWith07Phone() throws Exception {
+        UUID targetUserId = UUID.randomUUID();
+        AdminUpdateUserRequest req = new AdminUpdateUserRequest(
+                "Kasun Perera", "0771234567", Role.ADMIN, true, "https://img.example/admin.png"
+        );
+        UserSummaryResponse response = new UserSummaryResponse(
+                targetUserId, "kasun@example.com", "Kasun Perera", "0771234567",
+                "ADMIN", true, Instant.now(), null, "https://img.example/admin.png"
+        );
+
+        when(userService.adminUpdateUser(eq(targetUserId), any(AdminUpdateUserRequest.class))).thenReturn(response);
+
+        mockMvc.perform(put("/api/users/" + targetUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(targetUserId.toString()))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.phoneNumber").value("0771234567"));
+
+        verify(userService).adminUpdateUser(eq(targetUserId), any(AdminUpdateUserRequest.class));
+    }
+
+    @Test
+    @DisplayName("PUT /api/users/{userId}: should return 200 OK when changing customer role to ADMIN with +94XXXXXXXXX phone")
+    void updateUser_shouldReturnOk_whenChangingRoleToAdminWithPlus94Phone() throws Exception {
+        UUID targetUserId = UUID.randomUUID();
+        AdminUpdateUserRequest req = new AdminUpdateUserRequest(
+                "Kasun Perera", "+94771234567", Role.ADMIN, true, null
+        );
+        UserSummaryResponse response = new UserSummaryResponse(
+                targetUserId, "kasun@example.com", "Kasun Perera", "+94771234567",
+                "ADMIN", true, Instant.now(), null, null
+        );
+
+        when(userService.adminUpdateUser(eq(targetUserId), any(AdminUpdateUserRequest.class))).thenReturn(response);
+
+        mockMvc.perform(put("/api/users/" + targetUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.phoneNumber").value("+94771234567"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/users/{userId}: should return 200 OK when phone is empty string")
+    void updateUser_shouldReturnOk_whenPhoneIsEmpty() throws Exception {
+        UUID targetUserId = UUID.randomUUID();
+        AdminUpdateUserRequest req = new AdminUpdateUserRequest(
+                "Kasun Perera", "", Role.ADMIN, true, null
+        );
+        UserSummaryResponse response = new UserSummaryResponse(
+                targetUserId, "kasun@example.com", "Kasun Perera", null,
+                "ADMIN", true, Instant.now(), null, null
+        );
+
+        when(userService.adminUpdateUser(eq(targetUserId), any(AdminUpdateUserRequest.class))).thenReturn(response);
+
+        mockMvc.perform(put("/api/users/" + targetUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/users/{userId}: should return 400 Bad Request when phone number format is invalid")
+    void updateUser_shouldReturnBadRequest_whenPhoneFormatInvalid() throws Exception {
+        UUID targetUserId = UUID.randomUUID();
+        AdminUpdateUserRequest req = new AdminUpdateUserRequest(
+                "Kasun Perera", "12345", Role.ADMIN, true, null
+        );
+
+        mockMvc.perform(put("/api/users/" + targetUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.phoneNumber").value("Phone must match +94XXXXXXXXX or 0XXXXXXXXX"));
     }
 }
