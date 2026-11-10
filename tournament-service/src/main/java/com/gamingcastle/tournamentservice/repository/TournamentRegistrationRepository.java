@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface TournamentRegistrationRepository extends JpaRepository<TournamentRegistration, UUID> {
     List<TournamentRegistration> findByTournamentId(UUID tournamentId);
     List<TournamentRegistration> findByUserId(UUID userId);
+    List<TournamentRegistration> findByRegisteredAtAfterOrderByRegisteredAtDesc(java.time.Instant after);
+    void deleteByTournamentId(UUID tournamentId);
 }

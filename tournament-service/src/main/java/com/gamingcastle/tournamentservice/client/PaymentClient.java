@@ -49,6 +49,20 @@ public class PaymentClient {
      * @throws PaymentFailedException if the payment-service returns FAILED or is unreachable
      */
     public UUID chargeEntryFee(BigDecimal amount, UUID userId, UUID registrationId) {
+        return chargeEntryFee(amount, userId, registrationId, null);
+    }
+
+    /**
+     * Charges the tournament entry fee for the given user and registration, optionally redeeming loyalty points.
+     *
+     * @param amount                the entry fee amount
+     * @param userId                the customer's UUID (used as the payer identity)
+     * @param registrationId        the tournament registration UUID (used as referenceId)
+     * @param loyaltyPointsToRedeem optional loyalty points to redeem for entry fee discount
+     * @return the UUID of the successfully created payment record
+     * @throws PaymentFailedException if the payment-service returns FAILED or is unreachable
+     */
+    public UUID chargeEntryFee(BigDecimal amount, UUID userId, UUID registrationId, Integer loyaltyPointsToRedeem) {
         String idempotencyKey = userId.toString() + "-" + registrationId.toString();
 
         PaymentRequest request = new PaymentRequest(
@@ -56,7 +70,8 @@ public class PaymentClient {
                 registrationId,
                 amount,
                 "ONLINE",
-                idempotencyKey
+                idempotencyKey,
+                loyaltyPointsToRedeem
         );
 
         HttpHeaders headers = new HttpHeaders();
@@ -111,8 +126,19 @@ public class PaymentClient {
             UUID referenceId,
             BigDecimal amount,
             String method,
-            String idempotencyKey
-    ) {}
+            String idempotencyKey,
+            Integer loyaltyPointsToRedeem
+    ) {
+        public PaymentRequest(
+                String referenceType,
+                UUID referenceId,
+                BigDecimal amount,
+                String method,
+                String idempotencyKey
+        ) {
+            this(referenceType, referenceId, amount, method, idempotencyKey, null);
+        }
+    }
 
     /** Mirrors PaymentResponse in payment-service (only fields we need). */
     record PaymentResponse(

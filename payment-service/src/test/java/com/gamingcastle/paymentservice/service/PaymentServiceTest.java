@@ -247,6 +247,34 @@ class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("processPayment: redeems loyalty points for tournament entry fee when points provided")
+    void processPayment_shouldRedeemLoyalty_forTournamentEntryWhenPointsProvided() {
+        UUID userId = UUID.randomUUID();
+        UUID tournamentId = UUID.randomUUID();
+        PaymentRequest request = paymentRequest(tournamentId, new BigDecimal("100.00"), PaymentMethod.ONLINE, ReferenceType.TOURNAMENT_ENTRY, "tour-loyalty");
+        request.setLoyaltyPointsToRedeem(20);
+
+        when(paymentRepository.findByIdempotencyKey("tour-loyalty")).thenReturn(Optional.empty());
+        when(loyaltyClient.reserve(userId, tournamentId, new BigDecimal("100.00"), 20))
+                .thenReturn(new LoyaltyClient.ReserveResponse(UUID.randomUUID(), 20, new BigDecimal("5.00"), new BigDecimal("95.00"), 80L));
+        when(paymentGateway.processPayment(new BigDecimal("95.00"))).thenReturn(true);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId(UUID.randomUUID());
+            payment.setReceiptNumber("GC-TOUR-LOYALTY");
+            return payment;
+        });
+
+        PaymentResponse response = paymentService.processPayment(request, userId);
+
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getLoyaltyPointsUsed()).isEqualTo(20);
+        assertThat(response.getLoyaltyDiscount()).isEqualByComparingTo("5.00");
+        verify(loyaltyClient).reserve(userId, tournamentId, new BigDecimal("100.00"), 20);
+        verify(loyaltyClient).confirm(tournamentId);
+    }
+
+    @Test
     @DisplayName("processPayment: throws IllegalArgumentException when amount is zero or negative")
     void processPayment_shouldThrowException_whenAmountIsZeroOrNegative() {
         UUID userId = UUID.randomUUID();

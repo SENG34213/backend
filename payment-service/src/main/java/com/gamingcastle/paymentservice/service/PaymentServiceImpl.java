@@ -64,6 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
         validateAmount(request.getAmount());
 
         boolean bookingPayment = request.getReferenceType() == ReferenceType.BOOKING;
+        boolean eligibleForRedemption = bookingPayment || request.getReferenceType() == ReferenceType.TOURNAMENT_ENTRY;
         int pointsToRedeem = request.getLoyaltyPointsToRedeem() == null
                 ? 0 : request.getLoyaltyPointsToRedeem();
         if (pointsToRedeem < 0) {
@@ -71,7 +72,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         LoyaltyClient.ReserveResponse reservation = null;
-        if (bookingPayment && pointsToRedeem > 0) {
+        if (eligibleForRedemption && pointsToRedeem > 0) {
             reservation = loyaltyClient.reserve(
                     userId, request.getReferenceId(), request.getAmount(), pointsToRedeem);
         }
@@ -121,11 +122,13 @@ public class PaymentServiceImpl implements PaymentService {
 
         try {
             Payment savedPayment = paymentRepository.save(payment);
-            if (successful && bookingPayment) {
+            if (successful) {
                 if (reservation != null) {
                     loyaltyClient.confirm(request.getReferenceId());
                 }
-                loyaltyClient.award(userId, request.getReferenceId(), payableAmount, savedPayment.getId());
+                if (bookingPayment) {
+                    loyaltyClient.award(userId, request.getReferenceId(), payableAmount, savedPayment.getId());
+                }
             }
             return toResponse(savedPayment);
 

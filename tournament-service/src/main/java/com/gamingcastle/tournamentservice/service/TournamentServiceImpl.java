@@ -49,6 +49,14 @@ public class TournamentServiceImpl implements TournamentService {
     @Override
     @Transactional
     public TournamentResponse createAndPublishTournament(TournamentRequest request, UUID adminId) {
+        if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
+            throw new IllegalArgumentException("End date cannot be earlier than start date");
+        }
+
+        if (request.registrationDeadline().isAfter(request.startDate())) {
+            throw new IllegalArgumentException("Registration deadline cannot be after tournament start date");
+        }
+
         Tournament tournament = Tournament.builder()
                 .name(request.name())
                 .gameTitle(request.gameTitle())
@@ -133,6 +141,20 @@ public class TournamentServiceImpl implements TournamentService {
         
         tournament.setStatus(request.status());
         return mapToResponse(tournamentRepository.save(tournament));
+    }
+
+    @Override
+    @Transactional
+    public void deleteTournament(UUID id) {
+        Tournament tournament = tournamentRepository.findById(id)
+                .orElseThrow(() -> new TournamentNotFoundException("Tournament not found: " + id));
+
+        bracketRepository.findByTournamentId(id).ifPresent(bracket -> {
+            matchRepository.deleteByBracketId(bracket.getId());
+            bracketRepository.delete(bracket);
+        });
+        registrationRepository.deleteByTournamentId(id);
+        tournamentRepository.delete(tournament);
     }
 
     @Override
