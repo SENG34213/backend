@@ -18,7 +18,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -52,12 +54,18 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Override
     @Transactional(noRollbackFor = PaymentFailedException.class)
     public RegistrationResponse registerForTournament(UUID tournamentId, UUID userId) {
-        return registerForTournament(tournamentId, userId, null, null);
+        return registerForTournament(tournamentId, userId, null, null, null);
     }
 
     @Override
     @Transactional(noRollbackFor = PaymentFailedException.class)
     public RegistrationResponse registerForTournament(UUID tournamentId, UUID userId, String email, String fullName) {
+        return registerForTournament(tournamentId, userId, email, fullName, null);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = PaymentFailedException.class)
+    public RegistrationResponse registerForTournament(UUID tournamentId, UUID userId, String email, String fullName, Integer loyaltyPointsToRedeem) {
         // 1. Load tournament or 404
         Tournament tournament = tournamentRepository.findById(tournamentId)
                 .orElseThrow(() -> new TournamentNotFoundException(
@@ -119,7 +127,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         // then re-throws PaymentFailedException (→ HTTP 402) to the caller.
         UUID paymentId;
         try {
-            paymentId = paymentClient.chargeEntryFee(tournament.getEntryFee(), userId, registration.getId());
+            paymentId = loyaltyPointsToRedeem != null
+                    ? paymentClient.chargeEntryFee(tournament.getEntryFee(), userId, registration.getId(), loyaltyPointsToRedeem)
+                    : paymentClient.chargeEntryFee(tournament.getEntryFee(), userId, registration.getId());
         } catch (com.gamingcastle.tournamentservice.exception.PaymentFailedException e) {
             registration.setStatus(RegistrationStatus.CANCELLED);
             registrationRepository.saveAndFlush(registration);
@@ -182,6 +192,17 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Override
     public List<RegistrationResponse> getRegistrationsForUser(UUID userId) {
         return registrationRepository.findByUserId(userId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RegistrationResponse> getTodayRegistrations() {
+        ZonedDateTime startOfToday = LocalDate.now(SRI_LANKA_ZONE).atStartOfDay(SRI_LANKA_ZONE);
+        List<TournamentRegistration> list = registrationRepository
+                .findByRegisteredAtAfterOrderByRegisteredAtDesc(startOfToday.toInstant());
+        return list.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

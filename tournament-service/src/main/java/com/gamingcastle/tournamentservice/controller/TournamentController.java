@@ -123,11 +123,13 @@ public class TournamentController {
     @PostMapping("/{id}/register")
     public ResponseEntity<RegistrationResponse> registerForTournament(
             @PathVariable UUID id,
+            @RequestBody(required = false) RegistrationRequest request,
             @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader(value = "X-User-Email", required = false) String email,
             @RequestHeader(value = "X-User-FullName", required = false) String fullName
     ) {
-        RegistrationResponse response = registrationService.registerForTournament(id, userId, email, fullName);
+        Integer points = request != null ? request.loyaltyPointsToRedeem() : null;
+        RegistrationResponse response = registrationService.registerForTournament(id, userId, email, fullName, points);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -137,6 +139,13 @@ public class TournamentController {
             @RequestHeader("X-User-Id") UUID userId
     ) {
         return ResponseEntity.ok(registrationService.getRegistrationsForUser(userId));
+    }
+
+    /** Admin views customer registrations created today across all tournaments. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/today-registrations")
+    public ResponseEntity<List<RegistrationResponse>> getTodayRegistrations() {
+        return ResponseEntity.ok(registrationService.getTodayRegistrations());
     }
 
     /** FR-15, UC-09 step 4: Admin monitors registrations in real time. */

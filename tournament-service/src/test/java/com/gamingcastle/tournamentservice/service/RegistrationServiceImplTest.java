@@ -326,4 +326,50 @@ class RegistrationServiceImplTest {
         assertThatThrownBy(() -> registrationService.getRegistrationsForTournament(tournamentId))
                 .isInstanceOf(TournamentNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("registerForTournament with loyalty points should pass points to paymentClient")
+    void registerForTournament_withLoyaltyPoints_shouldPassToPaymentClient() {
+        when(tournamentRepository.findById(tournamentId)).thenReturn(Optional.of(tournament));
+        when(registrationRepository.findByTournamentId(tournamentId)).thenReturn(List.of());
+
+        UUID paymentId = UUID.randomUUID();
+        when(paymentClient.chargeEntryFee(eq(tournament.getEntryFee()), eq(userId), any(), eq(200))).thenReturn(paymentId);
+
+        when(registrationRepository.save(any(TournamentRegistration.class))).thenAnswer(i -> {
+            TournamentRegistration r = i.getArgument(0);
+            r.setId(UUID.randomUUID());
+            r.setRegisteredAt(Instant.now());
+            return r;
+        });
+
+        RegistrationResponse response = registrationService.registerForTournament(tournamentId, userId, "apex@test.com", "Apex King", 200);
+
+        assertThat(response).isNotNull();
+        assertThat(response.status()).isEqualTo(RegistrationStatus.CONFIRMED);
+        verify(paymentClient).chargeEntryFee(eq(tournament.getEntryFee()), eq(userId), any(), eq(200));
+    }
+
+    @Test
+    @DisplayName("getTodayRegistrations should return registrations registered today")
+    void getTodayRegistrations_shouldReturnTodayRegistrations() {
+        TournamentRegistration reg = TournamentRegistration.builder()
+                .id(UUID.randomUUID())
+                .tournament(tournament)
+                .userId(userId)
+                .userName("Player One")
+                .userEmail("player1@test.com")
+                .status(RegistrationStatus.CONFIRMED)
+                .registeredAt(Instant.now())
+                .build();
+
+        when(registrationRepository.findByRegisteredAtAfterOrderByRegisteredAtDesc(any(Instant.class)))
+                .thenReturn(List.of(reg));
+
+        List<RegistrationResponse> list = registrationService.getTodayRegistrations();
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).userName()).isEqualTo("Player One");
+        assertThat(list.get(0).userEmail()).isEqualTo("player1@test.com");
+    }
 }
