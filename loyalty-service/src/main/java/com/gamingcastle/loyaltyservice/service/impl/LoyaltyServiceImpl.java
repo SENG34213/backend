@@ -208,9 +208,6 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         }
 
         account.setPointsBalance(newBalance);
-        if (request.points() > 0) {
-            account.setLifetimeEarned(account.getLifetimeEarned() + request.points());
-        }
         LoyaltyRules rules = getRulesOrThrow();
         account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);

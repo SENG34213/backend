@@ -26,6 +26,10 @@ public class UserClient {
     private final String gatewaySecret;
     private final Map<UUID, String> nameCache = new ConcurrentHashMap<>();
 
+    public UserClient() {
+        this("http://localhost:8081", "");
+    }
+
     public UserClient(
             @Value("${services.user.base-url:http://localhost:8081}") String userServiceUrl,
             @Value("${gateway.internal-secret:}") String gatewaySecret) {
@@ -90,5 +94,9 @@ public class UserClient {
             String role,
             String phoneNumber,
             String avatarUrl
-    ) {}
+    ) {
+        public UserSummaryDto(UUID id, String username, String email, String fullName, String role) {
+            this(id, username, email, fullName, role, null, null);
+        }
+    }
 }
