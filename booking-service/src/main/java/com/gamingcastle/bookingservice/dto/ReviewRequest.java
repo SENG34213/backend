@@ -12,5 +12,12 @@ public record ReviewRequest(
         Double rating,
 
         @Size(max = 1000, message = "Comment must not exceed 1000 characters")
-        String comment
-) {}
+        String comment,
+
+        @Size(max = 255, message = "User name must not exceed 255 characters")
+        String userName
+) {
+    public ReviewRequest(Double rating, String comment) {
+        this(rating, comment, null);
+    }
+}

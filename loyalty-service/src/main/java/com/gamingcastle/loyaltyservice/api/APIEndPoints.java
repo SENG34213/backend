@@ -19,6 +19,7 @@ public final class APIEndPoints {
     public static final String balance = loyalty + "/balance" + userIdPath;
     public static final String history = loyalty + "/history" + userIdPath;
     public static final String calculateRedemption = loyalty + "/calculate-redemption";
+    public static final String publicRules = loyalty + "/rules";
 
     public static final String adminRules = adminLoyalty + "/rules";
     public static final String adminAdjust = adminLoyalty + "/adjust";
