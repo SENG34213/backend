@@ -73,22 +73,46 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public LoyaltyAccountResponse getBalance(UUID userId) {
         LoyaltyRules rules = getRulesOrThrow();
-        Optional<LoyaltyAccount> account = accountRepository.findByUserId(userId);
+        Optional<LoyaltyAccount> accountOpt = accountRepository.findByUserId(userId);
 
-        long balance = account.map(LoyaltyAccount::getPointsBalance).orElse(0L);
-        long lifetime = account.map(LoyaltyAccount::getLifetimeEarned).orElse(0L);
-        LoyaltyTier tier = account.map(LoyaltyAccount::getTier).orElse(LoyaltyTier.BRONZE);
+        if (accountOpt.isEmpty()) {
+            return new LoyaltyAccountResponse(
+                    userId,
+                    0L,
+                    0L,
+                    LoyaltyTier.BRONZE.name(),
+                    rules.getPointValueLkr(),
+                    BigDecimal.ZERO,
+                    rules.getSilverThreshold(),
+                    rules.getGoldThreshold(),
+                    rules.getSilverMultiplier(),
+                    rules.getGoldMultiplier());
+        }
+
+        LoyaltyAccount account = accountOpt.get();
+        long balance = account.getPointsBalance();
+        long lifetime = account.getLifetimeEarned();
+        LoyaltyTier calculatedTier = resolveTier(Math.max(balance, lifetime), rules);
+
+        if (account.getTier() != calculatedTier) {
+            account.setTier(calculatedTier);
+            accountRepository.save(account);
+        }
 
         return new LoyaltyAccountResponse(
                 userId,
                 balance,
                 lifetime,
-                tier.name(),
+                account.getTier().name(),
                 rules.getPointValueLkr(),
-                PointsCalculator.calculateDiscount(balance, rules.getPointValueLkr()));
+                PointsCalculator.calculateDiscount(balance, rules.getPointValueLkr()),
+                rules.getSilverThreshold(),
+                rules.getGoldThreshold(),
+                rules.getSilverMultiplier(),
+                rules.getGoldMultiplier());
     }
 
     @Override
@@ -155,6 +179,16 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         rules.setUpdatedBy(adminId == null ? null : adminId.toString());
 
         LoyaltyRules saved = rulesRepository.save(rules);
+        List<LoyaltyAccount> accounts = accountRepository.findAll();
+        if (accounts != null && !accounts.isEmpty()) {
+            for (LoyaltyAccount acc : accounts) {
+                LoyaltyTier newTier = resolveTier(Math.max(acc.getPointsBalance(), acc.getLifetimeEarned()), saved);
+                if (acc.getTier() != newTier) {
+                    acc.setTier(newTier);
+                }
+            }
+            accountRepository.saveAll(accounts);
+        }
         log.info("Loyalty rules updated: adminId={}", adminId);
         return toRulesResponse(saved);
     }
@@ -174,6 +208,8 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         }
 
         account.setPointsBalance(newBalance);
+        LoyaltyRules rules = getRulesOrThrow();
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
         transactionRepository.save(LoyaltyTransaction.builder()
                 .userId(request.userId())
@@ -216,7 +252,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         long newBalance = account.getPointsBalance() + points;
         account.setPointsBalance(newBalance);
         account.setLifetimeEarned(account.getLifetimeEarned() + points);
-        account.setTier(resolveTier(account.getLifetimeEarned(), rules));
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
 
         transactionRepository.save(LoyaltyTransaction.builder()
@@ -263,6 +299,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
 
         long newBalance = account.getPointsBalance() - request.points();
         account.setPointsBalance(newBalance);
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
 
         LoyaltyTransaction reservation = transactionRepository.save(LoyaltyTransaction.builder()
@@ -422,6 +459,8 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     private void giveReservedPointsBack(LoyaltyAccount account, LoyaltyTransaction reservation, String description) {
         long newBalance = account.getPointsBalance() + reservation.getPoints();
         account.setPointsBalance(newBalance);
+        LoyaltyRules rules = getRulesOrThrow();
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
 
         reservation.setStatus(LoyaltyTransactionStatus.RELEASED);
@@ -442,6 +481,8 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     private long restoreConfirmedRedemption(LoyaltyAccount account, LoyaltyTransaction redemption, String description) {
         long newBalance = account.getPointsBalance() + redemption.getPoints();
         account.setPointsBalance(newBalance);
+        LoyaltyRules rules = getRulesOrThrow();
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
 
         redemption.setStatus(LoyaltyTransactionStatus.RELEASED);
@@ -472,7 +513,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         long newBalance = account.getPointsBalance() - toRemove;
         account.setPointsBalance(newBalance);
         account.setLifetimeEarned(Math.max(0, account.getLifetimeEarned() - earned.getPoints()));
-        account.setTier(resolveTier(account.getLifetimeEarned(), rules));
+        account.setTier(resolveTier(Math.max(newBalance, account.getLifetimeEarned()), rules));
         accountRepository.save(account);
 
         String note = shortfall > 0 ? description + " (shortfall " + shortfall + " points already spent)" : description;
@@ -488,11 +529,17 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         return toRemove;
     }
 
-    private LoyaltyTier resolveTier(long lifetimeEarned, LoyaltyRules rules) {
-        if (lifetimeEarned >= rules.getGoldThreshold()) {
+    /**
+     * Resolves tier according to condition:
+     * - Under 1000 points: BRONZE
+     * - 1000-3000 points: SILVER
+     * - Above 3000 points: GOLD
+     */
+    private LoyaltyTier resolveTier(long points, LoyaltyRules rules) {
+        if (points > rules.getGoldThreshold()) {
             return LoyaltyTier.GOLD;
         }
-        if (lifetimeEarned >= rules.getSilverThreshold()) {
+        if (points >= rules.getSilverThreshold()) {
             return LoyaltyTier.SILVER;
         }
         return LoyaltyTier.BRONZE;
@@ -582,9 +629,13 @@ public class LoyaltyServiceImpl implements LoyaltyService {
                 acc.getUserId(),
                 acc.getPointsBalance(),
                 acc.getLifetimeEarned(),
-                acc.getTier() != null ? acc.getTier().name() : LoyaltyTier.BRONZE.name(),
+                resolveTier(Math.max(acc.getPointsBalance(), acc.getLifetimeEarned()), rules).name(),
                 rules.getPointValueLkr(),
-                PointsCalculator.calculateDiscount(acc.getPointsBalance(), rules.getPointValueLkr())
+                PointsCalculator.calculateDiscount(acc.getPointsBalance(), rules.getPointValueLkr()),
+                rules.getSilverThreshold(),
+                rules.getGoldThreshold(),
+                rules.getSilverMultiplier(),
+                rules.getGoldMultiplier()
         ));
     }
 

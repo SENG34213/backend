@@ -32,6 +32,9 @@ public class Review {
     @Column(nullable = false)
     private UUID userId;
 
+    @Column(name = "user_name")
+    private String userName;
+
     @JdbcTypeCode(SqlTypes.NUMERIC)
     @Column(nullable = false)
     private Double rating;

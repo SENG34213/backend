@@ -1,5 +1,6 @@
 package com.gamingcastle.bookingservice.service;
 
+import com.gamingcastle.bookingservice.client.UserClient;
 import com.gamingcastle.bookingservice.dto.ReviewRequest;
 import com.gamingcastle.bookingservice.dto.ReviewResponse;
 import com.gamingcastle.bookingservice.entity.Booking;
@@ -9,6 +10,7 @@ import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.ReviewRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +27,19 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final BookingRepository bookingRepository;
+    private final UserClient userClient;
 
-    public ReviewServiceImpl(ReviewRepository reviewRepository, BookingRepository bookingRepository) {
+    @Autowired
+    public ReviewServiceImpl(ReviewRepository reviewRepository,
+                             BookingRepository bookingRepository,
+                             @Autowired(required = false) UserClient userClient) {
         this.reviewRepository = reviewRepository;
         this.bookingRepository = bookingRepository;
+        this.userClient = userClient;
+    }
+
+    public ReviewServiceImpl(ReviewRepository reviewRepository, BookingRepository bookingRepository) {
+        this(reviewRepository, bookingRepository, null);
     }
 
     @Override
@@ -51,9 +62,15 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A review has already been submitted for this booking");
         }
 
+        String resolvedName = request.userName();
+        if ((resolvedName == null || resolvedName.isBlank()) && userClient != null) {
+            resolvedName = userClient.getUserFullName(userId).orElse(null);
+        }
+
         Review review = Review.builder()
                 .booking(booking)
                 .userId(userId)
+                .userName(resolvedName)
                 .rating(request.rating())
                 .comment(request.comment() != null ? request.comment().trim() : null)
                 .build();
@@ -107,10 +124,16 @@ public class ReviewServiceImpl implements ReviewService {
         UUID stationId = b != null && b.getStation() != null ? b.getStation().getId() : null;
         String gameTitle = b != null && b.getGame() != null ? b.getGame().getTitle() : "PS5 Gaming Session";
 
+        String resolvedName = r.getUserName();
+        if ((resolvedName == null || resolvedName.isBlank()) && r.getUserId() != null && userClient != null) {
+            resolvedName = userClient.getUserFullName(r.getUserId()).orElse(null);
+        }
+
         return new ReviewResponse(
                 r.getId(),
                 b != null ? b.getId() : null,
                 r.getUserId(),
+                resolvedName,
                 stationId,
                 stationCode,
                 gameTitle,

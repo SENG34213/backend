@@ -1,5 +1,6 @@
 package com.gamingcastle.bookingservice.service;
 
+import com.gamingcastle.bookingservice.client.UserClient;
 import com.gamingcastle.bookingservice.dto.ReviewRequest;
 import com.gamingcastle.bookingservice.dto.ReviewResponse;
 import com.gamingcastle.bookingservice.entity.Booking;
@@ -35,6 +36,9 @@ class ReviewServiceTest {
 
     @Mock
     private BookingRepository bookingRepository;
+
+    @Mock
+    private UserClient userClient;
 
     @InjectMocks
     private ReviewServiceImpl reviewService;

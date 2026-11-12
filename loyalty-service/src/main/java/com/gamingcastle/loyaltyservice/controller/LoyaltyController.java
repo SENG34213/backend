@@ -4,6 +4,7 @@ import com.gamingcastle.loyaltyservice.api.APIEndPoints;
 import com.gamingcastle.loyaltyservice.dto.request.CalculateRedemptionRequest;
 import com.gamingcastle.loyaltyservice.dto.response.CalculationResponse;
 import com.gamingcastle.loyaltyservice.dto.response.LoyaltyAccountResponse;
+import com.gamingcastle.loyaltyservice.dto.response.LoyaltyRulesResponse;
 import com.gamingcastle.loyaltyservice.dto.response.TransactionHistoryResponse;
 import com.gamingcastle.loyaltyservice.exception.ForbiddenOperationException;
 import com.gamingcastle.loyaltyservice.security.GatewayUserPrincipal;
@@ -36,6 +37,12 @@ public class LoyaltyController {
 
     public LoyaltyController(LoyaltyService loyaltyService) {
         this.loyaltyService = loyaltyService;
+    }
+
+    @Operation(summary = "Get current loyalty program rules and tier thresholds")
+    @GetMapping(APIEndPoints.publicRules)
+    public ResponseEntity<LoyaltyRulesResponse> getPublicRules() {
+        return ResponseEntity.ok(loyaltyService.getRules());
     }
 
     @Operation(summary = "Get a user's loyalty balance")
