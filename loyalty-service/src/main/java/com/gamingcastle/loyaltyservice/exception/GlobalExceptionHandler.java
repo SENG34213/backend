@@ -89,6 +89,15 @@ public class GlobalExceptionHandler {
                         HttpStatus.NOT_FOUND, request.getRequestURI()));
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.warn("Resource not found at {}: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(ErrorCodes.LOYALTY_ACCOUNT_NOT_FOUND, "Resource not found: " + ex.getResourcePath(),
+                        HttpStatus.NOT_FOUND, request.getRequestURI()));
+    }
+
     @ExceptionHandler(ForbiddenOperationException.class)
     public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenOperationException ex,
                                                          HttpServletRequest request) {

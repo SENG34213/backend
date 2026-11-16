@@ -3,6 +3,7 @@ package com.gamingcastle.loyaltyservice.controller;
 import com.gamingcastle.loyaltyservice.dto.request.CalculateRedemptionRequest;
 import com.gamingcastle.loyaltyservice.dto.response.CalculationResponse;
 import com.gamingcastle.loyaltyservice.dto.response.LoyaltyAccountResponse;
+import com.gamingcastle.loyaltyservice.dto.response.LoyaltyRulesResponse;
 import com.gamingcastle.loyaltyservice.dto.response.TransactionHistoryResponse;
 import com.gamingcastle.loyaltyservice.exception.ForbiddenOperationException;
 import com.gamingcastle.loyaltyservice.security.GatewayUserPrincipal;
@@ -221,5 +222,20 @@ class LoyaltyControllerTest {
         assertThatThrownBy(() -> controller.calculateRedemption(caller, request))
                 .isInstanceOf(ForbiddenOperationException.class)
                 .hasMessageContaining("You may only access your own loyalty data");
+    }
+
+    @Test
+    @DisplayName("When getPublicRules, then returns 200 OK and active rules")
+    void getPublicRules_shouldReturnOkAndRules() {
+        LoyaltyRulesResponse expected = new LoyaltyRulesResponse(
+                UUID.randomUUID(), new BigDecimal("100.00"), new BigDecimal("0.50"),
+                100L, 10L, 50L, 15L, 1000L, new BigDecimal("1.25"), 3000L, new BigDecimal("1.50"), "system");
+        when(loyaltyService.getRules()).thenReturn(expected);
+
+        ResponseEntity<LoyaltyRulesResponse> response = controller.getPublicRules();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(expected);
+        verify(loyaltyService).getRules();
     }
 }

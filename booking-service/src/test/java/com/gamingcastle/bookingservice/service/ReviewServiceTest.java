@@ -1,5 +1,6 @@
 package com.gamingcastle.bookingservice.service;
 
+import com.gamingcastle.bookingservice.client.UserClient;
 import com.gamingcastle.bookingservice.dto.ReviewRequest;
 import com.gamingcastle.bookingservice.dto.ReviewResponse;
 import com.gamingcastle.bookingservice.entity.Booking;
@@ -35,6 +36,9 @@ class ReviewServiceTest {
 
     @Mock
     private BookingRepository bookingRepository;
+
+    @Mock
+    private UserClient userClient;
 
     @InjectMocks
     private ReviewServiceImpl reviewService;
@@ -74,7 +78,7 @@ class ReviewServiceTest {
     @Test
     @DisplayName("addReview - successful review creation for confirmed booking")
     void addReview_Success() {
-        ReviewRequest request = new ReviewRequest(5, "Amazing experience with PS5 DualSense!");
+        ReviewRequest request = new ReviewRequest(4.5, "Amazing experience with PS5 DualSense!");
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(completedBooking));
         when(reviewRepository.existsByBookingId(bookingId)).thenReturn(false);
@@ -89,7 +93,7 @@ class ReviewServiceTest {
         ReviewResponse response = reviewService.addReview(bookingId, userId, request);
 
         assertThat(response).isNotNull();
-        assertThat(response.rating()).isEqualTo(5);
+        assertThat(response.rating()).isEqualTo(4.5);
         assertThat(response.comment()).isEqualTo("Amazing experience with PS5 DualSense!");
         assertThat(response.stationCode()).isEqualTo("PS5-01");
         assertThat(response.gameTitle()).isEqualTo("EA Sports FC 24");
@@ -99,7 +103,7 @@ class ReviewServiceTest {
     @DisplayName("addReview - throws 403 Forbidden when user is not booking owner")
     void addReview_ForbiddenUser() {
         UUID otherUser = UUID.randomUUID();
-        ReviewRequest request = new ReviewRequest(4, "Nice!");
+        ReviewRequest request = new ReviewRequest(4.0, "Nice!");
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(completedBooking));
 
@@ -111,7 +115,7 @@ class ReviewServiceTest {
     @Test
     @DisplayName("addReview - throws 409 Conflict when review already exists")
     void addReview_DuplicateReview() {
-        ReviewRequest request = new ReviewRequest(4, "Nice!");
+        ReviewRequest request = new ReviewRequest(4.0, "Nice!");
 
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(completedBooking));
         when(reviewRepository.existsByBookingId(bookingId)).thenReturn(true);

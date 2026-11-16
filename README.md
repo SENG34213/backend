@@ -2,6 +2,20 @@
 
 This folder contains the Spring Boot microservice backend for Gaming Castle. The services are intended to run alongside the sibling `infra` repository, which owns the local Docker and PostgreSQL setup.
 
+## 🚀 Live Deployment & Test Credentials
+
+- **Live Application URL**: [http://54.234.186.115:4200](http://54.234.186.115:4200)
+
+### Test Credentials
+
+| Role | Email / Username | Password |
+| :--- | :--- | :--- |
+| **User (Customer)** | `thivyamahe001@gmail.com` | `thivyamahe001` |
+| **Admin** | `gamingcastle_admin@gmail.com` | `Admin@12345` |
+
+---
+
+
 ## Service list
 
 - `eureka-server` — service discovery at `http://localhost:8761`

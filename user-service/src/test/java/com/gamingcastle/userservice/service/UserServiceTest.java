@@ -1,11 +1,14 @@
 package com.gamingcastle.userservice.service;
 
+import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.UserProfileResponse;
 import com.gamingcastle.userservice.dto.response.UserSummaryResponse;
 import com.gamingcastle.userservice.entity.DeactivatedBy;
 import com.gamingcastle.userservice.entity.Role;
 import com.gamingcastle.userservice.entity.User;
+import com.gamingcastle.userservice.exception.EmailAlreadyExistsException;
+import com.gamingcastle.userservice.exception.PhoneAlreadyExistsException;
 import com.gamingcastle.userservice.exception.UserAlreadyActiveException;
 import com.gamingcastle.userservice.exception.UserAlreadyDeactivatedException;
 import com.gamingcastle.userservice.exception.UserNotFoundException;
@@ -269,6 +272,85 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.activateUser(id))
                 .isInstanceOf(UserNotFoundException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    // --- adminCreateUser ---
+
+    @Test
+    void adminCreateUser_shouldCreateUserSuccessfully() {
+        AdminCreateUserRequest req = new AdminCreateUserRequest(
+                "New Player",
+                "newplayer@example.com",
+                "0771234567",
+                Role.CUSTOMER,
+                "Password123!",
+                "https://api.dicebear.com/7.x/bottts/svg?seed=new",
+                true
+        );
+
+        when(userRepository.existsByEmail("newplayer@example.com")).thenReturn(false);
+        when(userRepository.existsByPhoneNumber("0771234567")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            return User.builder()
+                    .id(UUID.randomUUID())
+                    .email(u.getEmail())
+                    .passwordHash(u.getPasswordHash())
+                    .fullName(u.getFullName())
+                    .phoneNumber(u.getPhoneNumber())
+                    .role(u.getRole())
+                    .avatarUrl(u.getAvatarUrl())
+                    .enabled(u.isEnabled())
+                    .build();
+        });
+
+        UserSummaryResponse response = userService.adminCreateUser(req);
+
+        assertThat(response).isNotNull();
+        assertThat(response.email()).isEqualTo("newplayer@example.com");
+        assertThat(response.fullName()).isEqualTo("New Player");
+        assertThat(response.role()).isEqualTo("CUSTOMER");
+        assertThat(response.enabled()).isTrue();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void adminCreateUser_shouldThrowEmailAlreadyExists_whenEmailExists() {
+        AdminCreateUserRequest req = new AdminCreateUserRequest(
+                "Duplicate Email",
+                "existing@example.com",
+                null,
+                Role.CUSTOMER,
+                null,
+                null,
+                true
+        );
+
+        when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.adminCreateUser(req))
+                .isInstanceOf(EmailAlreadyExistsException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void adminCreateUser_shouldThrowPhoneAlreadyExists_whenPhoneExists() {
+        AdminCreateUserRequest req = new AdminCreateUserRequest(
+                "Duplicate Phone",
+                "unique@example.com",
+                "0779999999",
+                Role.CUSTOMER,
+                null,
+                null,
+                true
+        );
+
+        when(userRepository.existsByEmail("unique@example.com")).thenReturn(false);
+        when(userRepository.existsByPhoneNumber("0779999999")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.adminCreateUser(req))
+                .isInstanceOf(PhoneAlreadyExistsException.class);
         verify(userRepository, never()).save(any());
     }
 }

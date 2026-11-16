@@ -45,7 +45,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/stations",            // public station browsing and availability (FR-06/G1)
             "/api/games",               // public game browsing and catalog
             "/api/tournaments",         // public tournament browsing
-            "/api/payments/payhere/notify" // public PayHere payment IPN webhook listener
+            "/api/payments/payhere/notify", // public PayHere payment IPN webhook listener
+            "/api/reviews/recent",      // public recent reviews on landing page
+            "/api/reviews/station",     // public station reviews and ratings
+            "/api/reviews/all",         // public reviews
+            "/api/bookings/reviews/recent" // alternate review path
     );
 
     @Override
@@ -121,6 +125,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicPath(String path) {
+        if ("/api/reviews/mine".equals(path) || "/api/bookings/reviews/mine".equals(path)) {
+            return false;
+        }
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 

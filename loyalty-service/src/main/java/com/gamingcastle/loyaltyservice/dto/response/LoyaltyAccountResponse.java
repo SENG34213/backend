@@ -9,6 +9,21 @@ public record LoyaltyAccountResponse(
         long lifetimeEarned,
         String tier,
         BigDecimal pointValue,
-        BigDecimal equivalentDiscount
+        BigDecimal equivalentDiscount,
+        long silverThreshold,
+        long goldThreshold,
+        BigDecimal silverMultiplier,
+        BigDecimal goldMultiplier
 ) {
+    public LoyaltyAccountResponse(
+            UUID userId,
+            long pointsBalance,
+            long lifetimeEarned,
+            String tier,
+            BigDecimal pointValue,
+            BigDecimal equivalentDiscount
+    ) {
+        this(userId, pointsBalance, lifetimeEarned, tier, pointValue, equivalentDiscount,
+                1000L, 3000L, new BigDecimal("1.25"), new BigDecimal("1.50"));
+    }
 }

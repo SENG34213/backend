@@ -86,7 +86,10 @@ class JwtAuthenticationFilterTest {
             "/api/auth/reactivate/confirm",
             "/actuator/health",
             "/api/stations",
-            "/api/tournaments"
+            "/api/tournaments",
+            "/api/reviews/recent",
+            "/api/reviews/station/1",
+            "/api/reviews/all"
     })
     @DisplayName("Public paths without Authorization header should proceed anonymously")
     void publicPaths_shouldProceedAnonymously_withoutAuthHeader(String path) {

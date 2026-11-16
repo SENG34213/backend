@@ -11,7 +11,7 @@ public record AdminUpdateUserRequest(
         @NotBlank(message = "Full name must not be blank")
         String fullName,
 
-        @Pattern(regexp = "^$|^\\+94[0-9]{9}$", message = "Phone must match +94XXXXXXXXX")
+        @Pattern(regexp = "^$|^(?:\\+94|0)[0-9]{9}$", message = "Phone must match +94XXXXXXXXX or 0XXXXXXXXX")
         String phoneNumber,
 
         Role role,

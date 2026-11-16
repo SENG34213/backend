@@ -164,15 +164,61 @@ class TournamentControllerTest {
                 Instant.now()
         );
 
-        when(registrationService.registerForTournament(tournamentId, userId, "user@test.com", "Gamer Pro"))
+        when(registrationService.registerForTournament(tournamentId, userId, "user@test.com", "Gamer Pro", null))
                 .thenReturn(regResponse);
 
         ResponseEntity<RegistrationResponse> response = tournamentController.registerForTournament(
-                tournamentId, userId, "user@test.com", "Gamer Pro"
+                tournamentId, null, userId, "user@test.com", "Gamer Pro"
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(regResponse);
+    }
+
+    @Test
+    @DisplayName("registerForTournament with loyalty points should call registration service and return 201 Created")
+    void registerForTournament_withLoyaltyPoints_shouldReturnCreated() {
+        RegistrationResponse regResponse = new RegistrationResponse(
+                UUID.randomUUID(),
+                tournamentId,
+                "FC 26 Invitational",
+                userId,
+                RegistrationStatus.CONFIRMED,
+                UUID.randomUUID(),
+                Instant.now()
+        );
+        RegistrationRequest req = new RegistrationRequest(userId, "GamerTag", 200);
+
+        when(registrationService.registerForTournament(tournamentId, userId, "user@test.com", "Gamer Pro", 200))
+                .thenReturn(regResponse);
+
+        ResponseEntity<RegistrationResponse> response = tournamentController.registerForTournament(
+                tournamentId, req, userId, "user@test.com", "Gamer Pro"
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isEqualTo(regResponse);
+    }
+
+    @Test
+    @DisplayName("getTodayRegistrations should return 200 OK with today's registrations")
+    void getTodayRegistrations_shouldReturnOkWithList() {
+        RegistrationResponse regResponse = new RegistrationResponse(
+                UUID.randomUUID(),
+                tournamentId,
+                "FC 26 Invitational",
+                userId,
+                RegistrationStatus.CONFIRMED,
+                UUID.randomUUID(),
+                Instant.now()
+        );
+
+        when(registrationService.getTodayRegistrations()).thenReturn(List.of(regResponse));
+
+        ResponseEntity<List<RegistrationResponse>> response = tournamentController.getTodayRegistrations();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsExactly(regResponse);
     }
 
     @Test
@@ -236,6 +282,15 @@ class TournamentControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(matchResponse);
+    }
+
+    @Test
+    @DisplayName("deleteTournament should call service and return 204 No Content")
+    void deleteTournament_shouldReturnNoContent() {
+        ResponseEntity<Void> response = tournamentController.deleteTournament(tournamentId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(tournamentService).deleteTournament(tournamentId);
     }
 
     @Test

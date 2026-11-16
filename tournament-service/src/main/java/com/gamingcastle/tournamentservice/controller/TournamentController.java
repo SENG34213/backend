@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,6 +79,14 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.updateTournament(id, request));
     }
 
+    /** Admin deletes a tournament. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTournament(@PathVariable UUID id) {
+        tournamentService.deleteTournament(id);
+        return ResponseEntity.noContent().build();
+    }
+
     /** FR-17: Admin updates tournament status (UPCOMING, ONGOING, COMPLETED). */
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/status")
@@ -86,6 +95,17 @@ public class TournamentController {
             @Valid @RequestBody TournamentStatusUpdateRequest request
     ) {
         return ResponseEntity.ok(tournamentService.updateTournamentStatus(id, request));
+    }
+
+    /** Customer participant or admin marks tournament as completed. */
+    @PatchMapping("/{id}/complete")
+    public ResponseEntity<TournamentResponse> completeTournament(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Role", defaultValue = "CUSTOMER") String role
+    ) {
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
+        return ResponseEntity.ok(tournamentService.completeTournament(id, userId, isAdmin));
     }
 
     /** UC-09 alt flow: Admin cancels a tournament — all registered participants notified. */
@@ -103,11 +123,13 @@ public class TournamentController {
     @PostMapping("/{id}/register")
     public ResponseEntity<RegistrationResponse> registerForTournament(
             @PathVariable UUID id,
+            @RequestBody(required = false) RegistrationRequest request,
             @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader(value = "X-User-Email", required = false) String email,
             @RequestHeader(value = "X-User-FullName", required = false) String fullName
     ) {
-        RegistrationResponse response = registrationService.registerForTournament(id, userId, email, fullName);
+        Integer points = request != null ? request.loyaltyPointsToRedeem() : null;
+        RegistrationResponse response = registrationService.registerForTournament(id, userId, email, fullName, points);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -117,6 +139,13 @@ public class TournamentController {
             @RequestHeader("X-User-Id") UUID userId
     ) {
         return ResponseEntity.ok(registrationService.getRegistrationsForUser(userId));
+    }
+
+    /** Admin views customer registrations created today across all tournaments. */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/today-registrations")
+    public ResponseEntity<List<RegistrationResponse>> getTodayRegistrations() {
+        return ResponseEntity.ok(registrationService.getTodayRegistrations());
     }
 
     /** FR-15, UC-09 step 4: Admin monitors registrations in real time. */

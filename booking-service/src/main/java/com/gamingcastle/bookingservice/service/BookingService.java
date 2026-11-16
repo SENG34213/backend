@@ -37,6 +37,9 @@ public interface BookingService {
      */
     BookingResponse cancelBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin);
 
+    /** Complete a booking — marks session as COMPLETED (admin or customer owner) */
+    BookingResponse completeBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin);
+
     /** Reschedule an existing CONFIRMED booking */
     BookingResponse rescheduleBooking(UUID bookingId, UUID callerId, boolean callerIsAdmin, BookingRequest request);
 

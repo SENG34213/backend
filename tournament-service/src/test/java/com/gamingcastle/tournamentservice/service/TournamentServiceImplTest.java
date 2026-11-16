@@ -117,6 +117,42 @@ class TournamentServiceImplTest {
         verify(tournamentRepository).save(any(Tournament.class));
     }
 
+    @Test
+    @DisplayName("createAndPublishTournament should throw IllegalArgumentException when endDate is before startDate")
+    void createAndPublishTournament_shouldThrow_whenEndDateBeforeStartDate() {
+        TournamentRequest request = new TournamentRequest(
+                "Valorant Showdown",
+                "Valorant",
+                Instant.now().plus(5, ChronoUnit.DAYS),
+                Instant.now().plus(4, ChronoUnit.DAYS),
+                new BigDecimal("2000.00"),
+                32,
+                Instant.now().plus(3, ChronoUnit.DAYS)
+        );
+
+        assertThatThrownBy(() -> tournamentService.createAndPublishTournament(request, adminId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("End date cannot be earlier than start date");
+    }
+
+    @Test
+    @DisplayName("createAndPublishTournament should throw IllegalArgumentException when deadline is after startDate")
+    void createAndPublishTournament_shouldThrow_whenDeadlineAfterStartDate() {
+        TournamentRequest request = new TournamentRequest(
+                "Valorant Showdown",
+                "Valorant",
+                Instant.now().plus(5, ChronoUnit.DAYS),
+                Instant.now().plus(6, ChronoUnit.DAYS),
+                new BigDecimal("2000.00"),
+                32,
+                Instant.now().plus(7, ChronoUnit.DAYS)
+        );
+
+        assertThatThrownBy(() -> tournamentService.createAndPublishTournament(request, adminId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Registration deadline cannot be after tournament start date");
+    }
+
     // ── getAllTournaments ───────────────────────────────────────────────────
 
     @Test
@@ -452,6 +488,34 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(tournamentId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> tournamentService.sendPreTournamentReminders(tournamentId))
+                .isInstanceOf(TournamentNotFoundException.class);
+    }
+
+    // ── deleteTournament ────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("deleteTournament should delete matches, bracket, registrations, and tournament")
+    void deleteTournament_shouldDeleteAllAssociatedData() {
+        UUID bracketId = UUID.randomUUID();
+        Bracket bracket = Bracket.builder().id(bracketId).tournamentId(tournamentId).build();
+
+        when(tournamentRepository.findById(tournamentId)).thenReturn(Optional.of(tournament));
+        when(bracketRepository.findByTournamentId(tournamentId)).thenReturn(Optional.of(bracket));
+
+        tournamentService.deleteTournament(tournamentId);
+
+        verify(matchRepository).deleteByBracketId(bracketId);
+        verify(bracketRepository).delete(bracket);
+        verify(registrationRepository).deleteByTournamentId(tournamentId);
+        verify(tournamentRepository).delete(tournament);
+    }
+
+    @Test
+    @DisplayName("deleteTournament should throw TournamentNotFoundException when tournament does not exist")
+    void deleteTournament_shouldThrowException_whenNotFound() {
+        when(tournamentRepository.findById(tournamentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tournamentService.deleteTournament(tournamentId))
                 .isInstanceOf(TournamentNotFoundException.class);
     }
 

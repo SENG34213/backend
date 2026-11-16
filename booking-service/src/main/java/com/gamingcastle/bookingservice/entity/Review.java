@@ -2,6 +2,8 @@ package com.gamingcastle.bookingservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,8 +32,12 @@ public class Review {
     @Column(nullable = false)
     private UUID userId;
 
+    @Column(name = "user_name")
+    private String userName;
+
+    @JdbcTypeCode(SqlTypes.NUMERIC)
     @Column(nullable = false)
-    private int rating;
+    private Double rating;
 
     @Column(columnDefinition = "TEXT")
     private String comment;

@@ -675,6 +675,90 @@ class BookingServiceTest {
                 });
     }
 
+    // ── completeBooking ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("completeBooking: customer completes own confirmed booking successfully")
+    void completeBooking_shouldSucceedForOwner() {
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .game(game)
+                .startTime(Instant.now().minus(2, ChronoUnit.HOURS))
+                .endTime(Instant.now().minus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.CONFIRMED)
+                .source(BookingSource.ONLINE)
+                .build();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BookingResponse response = bookingService.completeBooking(bookingId, userId, false);
+
+        assertThat(response.status()).isEqualTo(BookingStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("completeBooking: admin can complete any confirmed booking")
+    void completeBooking_shouldSucceedForAdmin_onOtherUserBooking() {
+        UUID bookingId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(otherUserId)
+                .station(station)
+                .game(game)
+                .startTime(Instant.now().minus(2, ChronoUnit.HOURS))
+                .endTime(Instant.now().minus(1, ChronoUnit.HOURS))
+                .status(BookingStatus.CONFIRMED)
+                .source(BookingSource.WALK_IN)
+                .build();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BookingResponse response = bookingService.completeBooking(bookingId, userId, true);
+
+        assertThat(response.status()).isEqualTo(BookingStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("completeBooking: throws FORBIDDEN when customer tries to complete another user's booking")
+    void completeBooking_shouldThrowForbidden_whenNotOwner() {
+        UUID bookingId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(otherUserId)
+                .station(station)
+                .game(game)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.completeBooking(bookingId, userId, false))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> assertThat(((BookingException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("completeBooking: throws CONFLICT when booking is already cancelled")
+    void completeBooking_shouldThrowConflict_whenCancelled() {
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .userId(userId)
+                .station(station)
+                .game(game)
+                .status(BookingStatus.CANCELLED)
+                .build();
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.completeBooking(bookingId, userId, false))
+                .isInstanceOf(BookingException.class)
+                .satisfies(e -> assertThat(((BookingException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
     // ── rescheduleBooking ─────────────────────────────────────────────────────
 
     @Test

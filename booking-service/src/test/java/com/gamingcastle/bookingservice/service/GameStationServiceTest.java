@@ -18,8 +18,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -293,5 +295,36 @@ class GameStationServiceTest {
                 .satisfies(e -> assertThat(((BookingException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         verifyNoInteractions(bookingRepository);
+    }
+
+    @Test
+    @DisplayName("getStationAvailability: marks morning past slots as unavailable when checking today in the evening")
+    void getStationAvailability_shouldMarkPastSlotsUnavailable_whenBookingInEvening() {
+        LocalDate date = LocalDate.of(2026, 11, 6);
+        ZoneId zone = ZoneId.of("Asia/Colombo");
+        // Simulate evening at 18:00 (6:00 PM)
+        Instant eveningNow = date.atTime(18, 0).atZone(zone).toInstant();
+        Clock fixedClock = Clock.fixed(eveningNow, zone);
+        GameStationService serviceWithClock = new GameStationServiceImpl(gameStationRepository, bookingRepository, fixedClock);
+
+        when(gameStationRepository.findById(stationId)).thenReturn(Optional.of(station));
+        when(bookingRepository.findOverlapping(eq(stationId), any(Instant.class), any(Instant.class)))
+                .thenReturn(Collections.emptyList());
+
+        List<SlotAvailabilityResponse> slots = serviceWithClock.getStationAvailability(stationId, date);
+
+        assertThat(slots).hasSize(13);
+        // Slots 9:00 to 17:00 (first 9 slots: 9, 10, 11, 12, 13, 14, 15, 16, 17) should be unavailable because they are in the past
+        for (int i = 0; i < 9; i++) {
+            assertThat(slots.get(i).available())
+                    .as("Slot at hour %d should be unavailable because it passed", 9 + i)
+                    .isFalse();
+        }
+        // Slots 18:00, 19:00, 20:00, 21:00 should be available
+        for (int i = 9; i < 13; i++) {
+            assertThat(slots.get(i).available())
+                    .as("Future slot at hour %d should be available", 9 + i)
+                    .isTrue();
+        }
     }
 }

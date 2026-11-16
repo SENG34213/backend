@@ -12,7 +12,7 @@ public record TournamentRequest(
         @NotBlank String name,
         @NotBlank String gameTitle,
         @NotNull @Future Instant startDate,
-        Instant endDate,
+        @Future Instant endDate,
         @NotNull @DecimalMin("0.0") BigDecimal entryFee,
         @Min(2) int maxParticipants,
         @NotNull @Future Instant registrationDeadline,

@@ -11,5 +11,20 @@ public record RegistrationResponse(
         UUID userId,
         RegistrationStatus status,
         UUID paymentId,
-        Instant registeredAt
-) {}
+        Instant registeredAt,
+        String gamerTag,
+        String userName,
+        String userEmail
+) {
+    public RegistrationResponse(
+            UUID id,
+            UUID tournamentId,
+            String tournamentName,
+            UUID userId,
+            RegistrationStatus status,
+            UUID paymentId,
+            Instant registeredAt
+    ) {
+        this(id, tournamentId, tournamentName, userId, status, paymentId, registeredAt, null, null, null);
+    }
+}

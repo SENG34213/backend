@@ -327,6 +327,38 @@ class BookingControllerTest {
         verifyNoInteractions(notificationClient);
     }
 
+    // ── PATCH /api/bookings/{id}/complete ─────────────────────────────────────
+
+    @Test
+    @DisplayName("PATCH /api/bookings/{id}/complete: completes booking successfully")
+    void completeBooking_shouldSucceed() throws Exception {
+        BookingResponse response = createSampleResponse(BookingStatus.COMPLETED, BookingSource.ONLINE);
+        when(bookingService.completeBooking(bookingId, userId, false)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/bookings/{id}/complete", bookingId)
+                        .header("X-User-Id", userId.toString())
+                        .header("X-User-Role", "CUSTOMER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        verify(bookingService).completeBooking(bookingId, userId, false);
+    }
+
+    @Test
+    @DisplayName("PATCH /api/bookings/{id}/complete: allows admin to complete any booking")
+    void completeBooking_shouldAllowAdmin() throws Exception {
+        BookingResponse response = createSampleResponse(BookingStatus.COMPLETED, BookingSource.ONLINE);
+        when(bookingService.completeBooking(bookingId, userId, true)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/bookings/{id}/complete", bookingId)
+                        .header("X-User-Id", userId.toString())
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        verify(bookingService).completeBooking(bookingId, userId, true);
+    }
+
     @Test
     @DisplayName("PATCH /api/bookings/{id}/cancel: returns 403 when trying to cancel another user's booking")
     void cancelBooking_shouldReturnForbidden_whenNotOwnBooking() throws Exception {

@@ -1,5 +1,6 @@
 package com.gamingcastle.userservice.controller;
 
+import com.gamingcastle.userservice.dto.request.AdminCreateUserRequest;
 import com.gamingcastle.userservice.dto.request.AdminUpdateUserRequest;
 import com.gamingcastle.userservice.dto.request.UpdateProfileRequest;
 import com.gamingcastle.userservice.dto.response.AdminUserStatsResponse;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -57,6 +59,15 @@ public class UserController {
             return ResponseEntity.ok(userService.searchUsers(search, role, enabled, pageable));
         }
         return ResponseEntity.ok(userService.getAllUsers(pageable));
+    }
+
+    @PostMapping(APIEndPoints.users)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserSummaryResponse> createUser(
+            @Valid @RequestBody AdminCreateUserRequest request) {
+        log.info("Admin creating new user: email={}, role={}", request.email(), request.role());
+        UserSummaryResponse response = userService.adminCreateUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping(APIEndPoints.userStats)

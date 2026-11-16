@@ -7,10 +7,12 @@ import com.gamingcastle.bookingservice.entity.GameStation;
 import com.gamingcastle.bookingservice.exception.BookingException;
 import com.gamingcastle.bookingservice.repository.BookingRepository;
 import com.gamingcastle.bookingservice.repository.GameStationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -28,10 +30,20 @@ public class GameStationServiceImpl implements GameStationService {
 
     private final GameStationRepository gameStationRepository;
     private final BookingRepository bookingRepository;
+    private final Clock clock;
 
     public GameStationServiceImpl(GameStationRepository gameStationRepository, BookingRepository bookingRepository) {
+        this(gameStationRepository, bookingRepository, Clock.system(SRI_LANKA_ZONE));
+    }
+
+    @Autowired
+    public GameStationServiceImpl(
+            GameStationRepository gameStationRepository,
+            BookingRepository bookingRepository,
+            @Autowired(required = false) Clock clock) {
         this.gameStationRepository = gameStationRepository;
         this.bookingRepository = bookingRepository;
+        this.clock = clock != null ? clock : Clock.system(SRI_LANKA_ZONE);
     }
 
     @Override
@@ -110,6 +122,7 @@ public class GameStationServiceImpl implements GameStationService {
 
         ZoneId zone = SRI_LANKA_ZONE;
         List<SlotAvailabilityResponse> slots = new ArrayList<>();
+        Instant now = clock.instant();
 
         // Generate 1-hour time slots from 09:00 to 22:00 for the requested date
         for (int hour = 9; hour < 22; hour++) {
@@ -117,7 +130,8 @@ public class GameStationServiceImpl implements GameStationService {
             Instant end = date.atTime(hour + 1, 0).atZone(zone).toInstant();
 
             var conflicts = bookingRepository.findOverlapping(id, start, end);
-            boolean available = conflicts.isEmpty();
+            boolean isPast = start.isBefore(now);
+            boolean available = !isPast && conflicts.isEmpty();
 
             slots.add(new SlotAvailabilityResponse(start, end, available));
         }
