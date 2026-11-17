@@ -4,7 +4,7 @@ This folder contains the Spring Boot microservice backend for Gaming Castle. The
 
 ## 🚀 Live Deployment & Test Credentials
 
-- **Live Application URL**: [http://54.234.186.115:4200](http://54.234.186.115:4200)
+- **Live Application URL**: [http://100.30.201.86:4200]
 
 ### Test Credentials
 
