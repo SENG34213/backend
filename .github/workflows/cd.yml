@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Publish Backend Docker Images"]
     types: [completed]
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch: # Allows manual one-click deployment trigger from GitHub Actions
 
 concurrency:
@@ -30,7 +30,22 @@ jobs:
             echo "🚀 [Backend CD] Starting deployment on AWS EC2..."
 
             # Navigate to docker-compose infra directory on EC2
-            cd /home/ubuntu/gaming-castle/infra
+            if [ -d "/home/ubuntu/infra" ]; then
+              cd /home/ubuntu/infra
+            elif [ -d "/home/ubuntu/gaming-castle/infra" ]; then
+              cd /home/ubuntu/gaming-castle/infra
+            else
+              echo "❌ Infra directory not found!" && exit 1
+            fi
+
+            # Set image tag based on branch (main -> latest, develop -> develop)
+            BRANCH_TAG="${{ github.ref_name }}"
+            if [ "$BRANCH_TAG" = "main" ]; then
+              export IMAGE_TAG="latest"
+            else
+              export IMAGE_TAG="$BRANCH_TAG"
+            fi
+            echo "🏷️ Deploying with IMAGE_TAG=$IMAGE_TAG"
 
             # Log in to GitHub Container Registry (ghcr.io)
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
