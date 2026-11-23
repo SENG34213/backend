@@ -50,3 +50,4 @@ jobs:
           tags: |
             ghcr.io/seng34213/${{ matrix.service }}:${{ github.ref_name }}
             ghcr.io/seng34213/${{ matrix.service }}:sha-${{ github.sha }}
+            ghcr.io/seng34213/${{ matrix.service }}:latest

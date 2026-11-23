@@ -1,0 +1,49 @@
+name: Backend Continuous Deployment (CD to AWS EC2)
+
+on:
+  workflow_run:
+    workflows: ["Publish Backend Docker Images"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: # Allows manual one-click deployment trigger from GitHub Actions
+
+concurrency:
+  group: production-backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Backend to AWS EC2
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy Backend to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            echo "🚀 [Backend CD] Starting deployment on AWS EC2..."
+
+            # Navigate to docker-compose infra directory on EC2
+            cd /home/ubuntu/gaming-castle/infra
+
+            # Log in to GitHub Container Registry (ghcr.io)
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull the latest backend container images
+            echo "📦 Pulling latest backend container images..."
+            docker compose pull
+
+            # Recreate updated backend services and their dependencies
+            echo "🔄 Restarting updated backend services..."
+            docker compose up -d --remove-orphans
+
+            # Clean up old unused images to save disk space on EC2
+            docker image prune -f
+
+            echo "✅ [Backend CD] Backend microservices successfully deployed to AWS EC2!"
